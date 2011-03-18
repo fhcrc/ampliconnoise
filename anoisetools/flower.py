@@ -59,12 +59,6 @@ class FlowerRecord(object):
         lines.append('  Quals:\t{0}'.format(' '.join(map(str, self.quals))))
         return '\n'.join(lines)
 
-    def _flow_to_string(self):
-        """
-        Converts the flow floats to a string
-        """
-        return ' '.join(('{:.2f}'.format(i) for i in self.flows))
-
     def to_anoise_raw(self):
         """
         Generates a string suitable for using as input to Ampiclonnoise,
@@ -86,6 +80,19 @@ class FlowerRecord(object):
         if failures:
             raise ValueError("Missing attribute(s): {0}".format(', '.join(failures)))
 
+    @property
+    def string_flows(self):
+        """
+        Returns the float flows as a list of properly formatted strings
+        (2 decimal places)
+        """
+        return ['{:.2f}'.format(i) for i in self.flows]
+
+    def _flow_to_string(self):
+        """
+        Converts the flow floats to a string
+        """
+        return ' '.join(self.string_flows)
 
 # Matches read headers in flower output
 _HEADER_REGEXP = re.compile(r'^\s*>(.*)')
