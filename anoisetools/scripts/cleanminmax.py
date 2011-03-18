@@ -3,6 +3,7 @@
 """
 
 import argparse
+import re
 import sys
 
 from anoisetools import flower
@@ -98,7 +99,8 @@ def invoke(reader, fa_handle, dat_handle, primer, min_length, max_length):
             # Write FASTA
             print >> fa_handle, '>{0}\n{1}'.format(record.identifier, sequence)
             # Write data
-            print >> dat_handle, record.identifier, len(flows), ' '.join(flows)
+            print >> dat_handle, record.identifier, len(flows),
+            print >> dat_handle, ' '.join(map(str, flows))
             good += 1
         else:
             bad += 1
