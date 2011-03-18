@@ -105,6 +105,7 @@ def read_flower(iterable):
     Reads an input containing lines from a flower sff.txt output,
     returning a generator of FlowerRecords contained in the input.
     """
+    # Possible TODO: track line numbers for reporting errors?
     header = next(iterable)
     if not _is_header(header):
         raise ValueError("Invalid record identifier: {0}".format(header))
