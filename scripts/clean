@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from anoisetools.scripts import cleanminmax
+from anoisetools.scripts import clean
 
 if __name__ == '__main__':
-    cleanminmax.main()
+    clean.main()

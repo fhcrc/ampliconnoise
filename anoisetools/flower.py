@@ -65,6 +65,10 @@ class FlowerRecord(object):
         """
         return ' '.join(('{:.2f}'.format(i) for i in self.flows))
 
+    @property
+    def right_trim(self):
+        return self.clip[1]
+
     def to_anoise_raw(self):
         """
         Generates a string suitable for using as input to Ampiclonnoise,

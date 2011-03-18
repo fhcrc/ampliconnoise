@@ -1,16 +1,17 @@
 """
-
+Implementation of cleaning script
 """
 
 import argparse
 import re
+import shutil
 import sys
+import tempfile
 
 from anoisetools import flower, anoiseio
 
-DEFAULT_MIN_FLOWS = 400
-DEFAULT_MAX_FLOWS = 600
-MAX_ANOISE_LENGTH = 360
+DEFAULT_MIN_FLOWS = None
+DEFAULT_MAX_FLOWS = 360
 
 def is_flowgram_valid(flowgram, high_signal_cutoff=9.49,
                       low_signal_cutoff=0.7, signal_start=0.5):
@@ -18,7 +19,7 @@ def is_flowgram_valid(flowgram, high_signal_cutoff=9.49,
     Checks for a valid flowgram, defined as:
     * no reads above high_signal_cutoff
     * no reads in (signal_start, low_signal_cutoff)
-    * At least one reading
+    * At least one bp read
     """
 
     # Check arguments
@@ -41,6 +42,27 @@ def is_flowgram_valid(flowgram, high_signal_cutoff=9.49,
 
     return noisy == 0 and signal > 0
 
+def trim_noise(flows):
+    """
+    Trims flows to the first noisy flowgram found
+    """
+    flowgram_size = 4
+
+    stop = len(flows)
+
+    # Iterate through the reads in groups of 4,
+    # Making sure that there's
+    # A) 1+ with signal above threshold
+    # B) 0 with excessively high or low signal
+    for i in xrange(0, len(flows), flowgram_size):
+        flowgram = flows[i:i + flowgram_size]
+
+        if not is_flowgram_valid(flowgram):
+            stop = i
+            break
+
+    return flows[:stop]
+
 def handle_record(flows, primer_re, min_flows, max_flows):
     """
     Processes a record, checks for validity and returns the result
@@ -58,31 +80,24 @@ def handle_record(flows, primer_re, min_flows, max_flows):
     flow_length = len(flows)
     flowgram_size = 4
 
-    # Iterate through the reads in groups of 4,
-    # Making sure that there's
-    # A) 1+ with signal above threshold
-    # B) 0 with excessively high or low signal
-    trimmed_length = flow_length
-    for i in xrange(0, flow_length, flowgram_size):
-        flowgram = flows[i:i + flowgram_size]
-        if not is_flowgram_valid(flowgram):
-            trimmed_length = i
-
-    trimmed_flows = flows[:trimmed_length]
+    trimmed_flows = trim_noise(flows)
     trimmed_reading = flower.flow_to_seq(trimmed_flows)
+    print trimmed_reading
 
     m = primer_re.match(trimmed_reading)
-    if trimmed_length >= min_flows and m:
+    if (min_flows is None or trimmed_length >= min_flows) and m:
         sequence = m.group(1)
 
-        flow_result = trimmed_flows[:MAX_ANOISE_LENGTH]
+        # Truncate the flow result to a maximum length
+        # Note that the FASTA result is unchanged
+        flow_result = trimmed_flows[:max_flows]
 
         return (sequence, flow_result)
     else:
         return (None, None)
 
 
-def invoke(reader, fa_handle, dat_handle, primer, min_flows, max_flows):
+def invoke(reader, fa_handle, dat_path, primer, min_flows, max_flows):
     """
     Main routine. Loop over the records in reader, write good results to
     fa_handle and dat_handle respectively.
@@ -90,20 +105,34 @@ def invoke(reader, fa_handle, dat_handle, primer, min_flows, max_flows):
     good = 0
     bad = 0
     primer_re = re.compile(r'^TCAG.*({0}.*)'.format(primer))
-    for record in reader:
-        sequence, flows = handle_record(record.flows, primer_re, min_flows,
-                                        max_flows)
-        if sequence and flows:
-            # Write FASTA
-            print >> fa_handle, '>{0}\n{1}'.format(record.identifier, sequence)
-            # Write data
-            print >> dat_handle, record.identifier, len(flows),
-            print >> dat_handle, ' '.join(map(str, flows))
-            good += 1
-        else:
-            bad += 1
+    with tempfile.TemporaryFile() as dat_handle:
+        for record in reader:
+            print record.identifier,
+            sequence, flows = handle_record(record.flows, primer_re, min_flows,
+                                            max_flows)
+            if sequence and flows:
+                # Write FASTA
+                print >> fa_handle, '>{0}\n{1}'.format(record.identifier,
+                                                       sequence)
+                # Write data
+                print >> dat_handle, record.identifier, len(flows),
+                print >> dat_handle, ' '.join(map(str, flows))
+                good += 1
+            else:
+                bad += 1
 
-    print '{0} good records, {1} bad records'.format(good, bad)
+
+        print '{0} good records, {1} bad records'.format(good, bad)
+
+        # Second pass - add a line with number clean and maximum length
+        # to the dat file
+        dat_path = dat_handle.name
+
+        # Copy from temp file to final file
+        dat_handle.seek(0)
+        with open(dat_path, 'w') as dat_fp:
+            print >> dat_fp, good, max_flows
+            shutil.copyfileobj(dat_handle, dat_fp)
 
 
 def main(args=sys.argv[1:]):
@@ -113,10 +142,10 @@ def main(args=sys.argv[1:]):
     parser = argparse.ArgumentParser()
     parser.add_argument('--min-flows', type=int,
             help="Minimum length to accept sequence"
-            " default: %(default)d", default=DEFAULT_MIN_FLOWS)
+            " default: %(default)s", default=DEFAULT_MIN_FLOWS)
     parser.add_argument('--max-flows', type=int,
             help="Maximum length to trim sequences to "
-            "default: %(default)d", default=DEFAULT_MAX_FLOWS)
+            "default: %(default)s", default=DEFAULT_MAX_FLOWS)
     parser.add_argument('primer', metavar='PRIMER',
             help="Regexp to identify primer sequence")
     parser.add_argument('outname', metavar="OUTNAME",
@@ -135,9 +164,7 @@ def main(args=sys.argv[1:]):
         else:
             reader = flower.read_flower(parsed.input)
         with open(parsed.outname + '.fa', 'w') as fasta_handle:
-            with open(parsed.outname + '.dat', 'w') as dat_handle:
-                invoke(reader, fasta_handle, dat_handle,
-                       parsed.primer, parsed.min_flows, parsed.max_flows)
+            invoke(reader, fasta_handle, parsed.outname + '.dat',
+                   parsed.primer, parsed.min_flows, parsed.max_flows)
     finally:
         parsed.input.close()
-
