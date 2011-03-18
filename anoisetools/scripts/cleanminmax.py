@@ -123,7 +123,7 @@ def main(args=sys.argv[1:]):
             help="Regexp to identify primer sequence")
     parser.add_argument('outname', metavar="OUTNAME",
             help="base name for output files - OUTNAME.fa and OUTNAME.dat")
-    parser.add_argument('input', metavar='INPUT', default=sys.stdin,
+    parser.add_argument('--input', metavar='INPUT', default=sys.stdin,
             type=argparse.FileType('r'),
             help='Input flower-processed data file (default: stdin)')
     parsed = parser.parse_args(args)

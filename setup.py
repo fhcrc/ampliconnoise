@@ -9,4 +9,5 @@ setup(name = 'anoisetools',
       author_email = 'cmccoy@fhcrc.org',
       packages = ['anoisetools', 'anoisetools.test'],
       requires = ['Python (>= 2.7)'],
+      scripts = ['scripts/cleanminmax'],
       )
