@@ -59,7 +59,17 @@ def read_flower(iterable):
     if not _is_header(header):
         raise ValueError("Invalid record identifier: {}".format(header))
 
-    record = FlowerRecord(header[1:])
+    # Populate key handlers - each is a function taking a value,
+    # Returning the value to set the lower case attribute on the record
+    key_handlers = {}
+    key_handlers['Info'] = lambda value: value
+    key_handlers['Bases'] = key_handlers['Info']
+    key_handlers['Clip'] = lambda value: map(int, value.split())
+    key_handlers['Index'] = key_handlers['Clip']
+    key_handlers['Quals'] = key_handlers['Clip']
+    key_handlers['Flows'] = lambda value: map(float, value.split())
+
+    record = FlowerRecord(_HEADER_REGEXP.match(header).group(1))
 
     while True:
         try:
@@ -76,11 +86,11 @@ def read_flower(iterable):
             continue
         key, value = m.groups()
 
-        if key in ('Info', 'Bases'):
-            setattr(record, key.lower(), value)
-        elif key in ('Clip', 'Index', 'Quals'):
-            setattr(record, key.lower(), map(int, value.split()))
-        elif key == 'Flows':
-            record.flows = map(float, value.split())
-        else:
+        try:
+            if getattr(record, key.lower(), None) is not None:
+                raise ValueError("{0} already set: {1}",
+                                 getattr(record, key.lower()))
+            else:
+                setattr(record, key.lower(), key_handlers[key](value))
+        except KeyError:
             raise ValueError("Unknown key: {}".format(key))
