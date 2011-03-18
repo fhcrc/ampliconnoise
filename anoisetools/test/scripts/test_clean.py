@@ -101,53 +101,7 @@ class TestHandleRecord(unittest.TestCase):
         actual = clean.handle_record(self.flows, regex, 400, 600)
         self.assertTrue(actual[0] is not None)
         self.assertTrue(actual[1] is not None)
-
-        self.fail("Check results")
-
-class PerlOutputCompare(unittest.TestCase):
-
-    def setUp(self):
-        d = os.path.dirname(__file__)
-        infile = os.path.join(d, 'data', 'AA-1-pol756.raw')
-        self.fp = open(infile)
-        # Ignoring first line
-        self.fp.readline()
-        with open(infile + '.fa') as fp:
-            self.fasta_compare = fp.read()
-        with open(infile + '.dat') as fp:
-            self.dat_compare = fp.read()
-
-    def tearDown(self):
-        self.fp.close()
-
-    def test_invoke(self):
-        def reader(fp):
-            while True:
-                header = next(fp)
-                header = header[1:]
-                data = next(fp)
-                data = map(float, data.split()[1:])
-                record = flower.FlowerRecord(header)
-                record.flows = data
-                yield record
-        fasta_handle = StringIO()
-        dat_handle = StringIO()
-        primer = 'AATTGGGCCTGAAAATCCATA'
-        min_length = clean.DEFAULT_MIN_FLOWS
-        max_length = 720
-
-        clean.invoke(reader(self.fp), fasta_handle, dat_handle,
-                           primer, min_length, max_length)
-
-        fasta_str = fasta_handle.getvalue()
-        dat_str = dat_handle.getvalue()
-
-        self.assertTrue(len(fasta_str) > 0)
-        self.assertTrue(len(dat_str) > 0)
-
-        self.assertEquals(self.fasta_compare.splitlines(), fasta_str.splitlines())
-        self.assertEquals(self.dat_compare, dat_str)
-
-        self.fail("todo")
+        # TODO: Expand
 
 
+# TODO: Compare to perl
