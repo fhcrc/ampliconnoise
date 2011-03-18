@@ -12,6 +12,21 @@ DEFAULT_MIN_FLOWS = 400
 DEFAULT_MAX_FLOWS = 600
 MAX_ANOISE_LENGTH = 360
 
+def _anoise_reader(fp):
+    """
+    Reader for anoise files
+    """
+    fp = (i.rstrip('\n') for i in fp)
+    header = next(fp)
+    while True:
+        header = next(fp)[1:]
+        flows = next(fp).split()[1:]
+        flows = map(float, flows)
+        record = flower.FlowerRecord(header)
+        record.flows = flows
+        yield record
+
+
 def is_flowgram_valid(flowgram, high_signal_cutoff=9.49,
                       low_signal_cutoff=0.7, signal_start=0.5):
     """
@@ -79,8 +94,6 @@ def handle_record(flows, primer_re, min_flows, max_flows):
 
         return (sequence, flow_result)
     else:
-        print 'failed', m, trimmed_length
-        print trimmed_reading,
         return (None, None)
 
 
@@ -126,13 +139,19 @@ def main(args=sys.argv[1:]):
     parser.add_argument('--input', metavar='INPUT', default=sys.stdin,
             type=argparse.FileType('r'),
             help='Input flower-processed data file (default: stdin)')
+    parser.add_argument('--anoise-input', action='store_true',
+            help='Input is in ampiclonnoise raw file format',
+            default=False)
     parsed = parser.parse_args(args)
 
     try:
-        reader = flower.read_flower(parsed.input)
+        if parsed.anoise_input:
+            reader = _anoise_reader(parsed.input)
+        else:
+            reader = flower.read_flower(parsed.input)
         with open(parsed.outname + '.fa', 'w') as fasta_handle:
             with open(parsed.outname + '.dat', 'w') as dat_handle:
-                invoke(parsed.input, fasta_handle, dat_handle,
+                invoke(reader, fasta_handle, dat_handle,
                        parsed.primer, parsed.min_flows, parsed.max_flows)
     finally:
         parsed.input.close()
