@@ -8,8 +8,8 @@ import sys
 
 from anoisetools import flower
 
-DEFAULT_MIN_LENGTH = 400
-DEFAULT_MAX_LENGTH = 600
+DEFAULT_MIN_FLOWS = 400
+DEFAULT_MAX_FLOWS = 600
 MAX_ANOISE_LENGTH = 360
 
 def is_flowgram_valid(flowgram, high_signal_cutoff=9.49,
@@ -41,14 +41,14 @@ def is_flowgram_valid(flowgram, high_signal_cutoff=9.49,
 
     return noisy == 0 and signal > 0
 
-def handle_record(flows, primer_re, min_length, max_length):
+def handle_record(flows, primer_re, min_flows, max_flows):
     """
     Processes a record, checks for validity and returns the result
 
     primer_re must return a single group containing the primer
     and remainder of the sequence
 
-    If the record has good data and meets the min_length requirement:
+    If the record has good data and meets the min_flows requirement:
     Returns a length-2 tuple containing the sequence to be
     written to the FASTA file, and a set of flows trimmed to
     MAX_ANOISE_LENGTH.
@@ -72,7 +72,7 @@ def handle_record(flows, primer_re, min_length, max_length):
     trimmed_reading = flower.flow_to_seq(trimmed_flows)
 
     m = primer_re.match(trimmed_reading)
-    if trimmed_length >= min_length and m:
+    if trimmed_length >= min_flows and m:
         sequence = m.group(1)
 
         flow_result = trimmed_flows[:MAX_ANOISE_LENGTH]
@@ -84,7 +84,7 @@ def handle_record(flows, primer_re, min_length, max_length):
         return (None, None)
 
 
-def invoke(reader, fa_handle, dat_handle, primer, min_length, max_length):
+def invoke(reader, fa_handle, dat_handle, primer, min_flows, max_flows):
     """
     Main routine. Loop over the records in reader, write good results to
     fa_handle and dat_handle respectively.
@@ -93,8 +93,8 @@ def invoke(reader, fa_handle, dat_handle, primer, min_length, max_length):
     bad = 0
     primer_re = re.compile(r'^TCAG.*({0}.*)'.format(primer))
     for record in reader:
-        sequence, flows = handle_record(record.flows, primer_re, min_length,
-                                        max_length)
+        sequence, flows = handle_record(record.flows, primer_re, min_flows,
+                                        max_flows)
         if sequence and flows:
             # Write FASTA
             print >> fa_handle, '>{0}\n{1}'.format(record.identifier, sequence)
@@ -113,12 +113,12 @@ def main(args=sys.argv[1:]):
     Check arguments, call invoke(...)
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument('--min-length', type=int,
+    parser.add_argument('--min-flows', type=int,
             help="Minimum length to accept sequence"
-            " default: %(default)d", default=DEFAULT_MIN_LENGTH)
-    parser.add_argument('--max-length', type=int,
+            " default: %(default)d", default=DEFAULT_MIN_FLOWS)
+    parser.add_argument('--max-flows', type=int,
             help="Maximum length to trim sequences to "
-            "default: %(default)d", default=DEFAULT_MAX_LENGTH)
+            "default: %(default)d", default=DEFAULT_MAX_FLOWS)
     parser.add_argument('primer', metavar='PRIMER',
             help="Regexp to identify primer sequence")
     parser.add_argument('outname', metavar="OUTNAME",
@@ -133,7 +133,7 @@ def main(args=sys.argv[1:]):
         with open(parsed.outname + '.fa', 'w') as fasta_handle:
             with open(parsed.outname + '.dat', 'w') as dat_handle:
                 invoke(parsed.input, fasta_handle, dat_handle,
-                       parsed.primer, parsed.min_length, parsed.max_length)
+                       parsed.primer, parsed.min_flows, parsed.max_flows)
     finally:
         parsed.input.close()
 

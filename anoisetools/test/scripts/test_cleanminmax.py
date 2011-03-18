@@ -133,7 +133,7 @@ class PerlOutputCompare(unittest.TestCase):
         fasta_handle = StringIO()
         dat_handle = StringIO()
         primer = 'AATTGGGCCTGAAAATCCATA'
-        min_length = cleanminmax.DEFAULT_MIN_LENGTH
+        min_length = cleanminmax.DEFAULT_MIN_FLOWS
         max_length = 720
 
         cleanminmax.invoke(reader(self.fp), fasta_handle, dat_handle,
