@@ -1,5 +1,5 @@
 """
-Tests for cleanminmax.py
+Tests for clean.py
 """
 
 from cStringIO import StringIO
@@ -8,33 +8,33 @@ import re
 import unittest
 
 from anoisetools import flower
-from anoisetools.scripts import cleanminmax
+from anoisetools.scripts import clean
 
 
 class TestFlowgramValid(unittest.TestCase):
     def test_basic(self):
         flowgram = [1.0, 1.0, 0.0, 1.0]
-        self.assertEquals(True, cleanminmax.is_flowgram_valid(flowgram))
+        self.assertEquals(True, clean.is_flowgram_valid(flowgram))
 
     def test_high_signal(self):
         flowgram_accept = [1.0, 1.0, 9.49, 0.2]
         flowgram_reject = [1.0, 1.0, 9.51, 0.2]
-        self.assertEquals(True, cleanminmax.is_flowgram_valid(flowgram_accept))
-        self.assertEquals(False, cleanminmax.is_flowgram_valid(flowgram_reject))
+        self.assertEquals(True, clean.is_flowgram_valid(flowgram_accept))
+        self.assertEquals(False, clean.is_flowgram_valid(flowgram_reject))
 
     def test_low_signal(self):
         flowgram_accept = [1.0, 1.0, 1.0, 0.7]
         flowgram_reject = [1.0, 1.0, 1.0, 0.6]
-        self.assertEquals(True, cleanminmax.is_flowgram_valid(flowgram_accept))
-        self.assertEquals(False, cleanminmax.is_flowgram_valid(flowgram_reject))
+        self.assertEquals(True, clean.is_flowgram_valid(flowgram_accept))
+        self.assertEquals(False, clean.is_flowgram_valid(flowgram_reject))
 
     def test_no_signal(self):
         flowgram_nosignal = [0.0] * 4
-        self.assertEquals(False, cleanminmax.is_flowgram_valid(flowgram_nosignal))
+        self.assertEquals(False, clean.is_flowgram_valid(flowgram_nosignal))
 
     def test_arg_count(self):
         self.assertRaisesRegexp(ValueError, "^Unexpected flowgram length",
-                cleanminmax.is_flowgram_valid, range(5))
+                clean.is_flowgram_valid, range(5))
 
 class TestHandleRecord(unittest.TestCase):
 
@@ -98,7 +98,7 @@ class TestHandleRecord(unittest.TestCase):
         assert len(self.flows) >= 400
 
         regex = re.compile('^TCAG.*?(A.*)')
-        actual = cleanminmax.handle_record(self.flows, regex, 400, 600)
+        actual = clean.handle_record(self.flows, regex, 400, 600)
         self.assertTrue(actual[0] is not None)
         self.assertTrue(actual[1] is not None)
 
@@ -133,10 +133,10 @@ class PerlOutputCompare(unittest.TestCase):
         fasta_handle = StringIO()
         dat_handle = StringIO()
         primer = 'AATTGGGCCTGAAAATCCATA'
-        min_length = cleanminmax.DEFAULT_MIN_FLOWS
+        min_length = clean.DEFAULT_MIN_FLOWS
         max_length = 720
 
-        cleanminmax.invoke(reader(self.fp), fasta_handle, dat_handle,
+        clean.invoke(reader(self.fp), fasta_handle, dat_handle,
                            primer, min_length, max_length)
 
         fasta_str = fasta_handle.getvalue()

@@ -6,26 +6,11 @@ import argparse
 import re
 import sys
 
-from anoisetools import flower
+from anoisetools import flower, anoiseio
 
 DEFAULT_MIN_FLOWS = 400
 DEFAULT_MAX_FLOWS = 600
 MAX_ANOISE_LENGTH = 360
-
-def _anoise_reader(fp):
-    """
-    Reader for anoise files
-    """
-    fp = (i.rstrip('\n') for i in fp)
-    header = next(fp)
-    while True:
-        header = next(fp)[1:]
-        flows = next(fp).split()[1:]
-        flows = map(float, flows)
-        record = flower.FlowerRecord(header)
-        record.flows = flows
-        yield record
-
 
 def is_flowgram_valid(flowgram, high_signal_cutoff=9.49,
                       low_signal_cutoff=0.7, signal_start=0.5):
@@ -146,7 +131,7 @@ def main(args=sys.argv[1:]):
 
     try:
         if parsed.anoise_input:
-            reader = _anoise_reader(parsed.input)
+            reader = anoiseio.splitkeys_reader(parsed.input)
         else:
             reader = flower.read_flower(parsed.input)
         with open(parsed.outname + '.fa', 'w') as fasta_handle:
