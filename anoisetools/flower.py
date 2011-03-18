@@ -31,6 +31,10 @@ class FlowerRecord(object):
     """
     Flower record
     """
+
+    __slots__ = ['identifier', 'info', 'clip',
+                 'flows', 'index', 'bases', 'quals']
+
     def __init__(self, identifier):
         self.identifier = identifier
         self.info = None
@@ -46,14 +50,14 @@ class FlowerRecord(object):
         """
         # TODO: make this a little less repetitive
         lines = []
-        lines.append('  >{}'.format(self.identifier))
-        lines.append('  Info:   {}'.format(self.info))
-        lines.append('  Clip:   {}'.format(' '.join(map(str, self.clip))))
-        lines.append('  Flows:  {}'.format(' '.join(['{:.2f}'.format(i)
-                                                     for i in self.flows])))
-        lines.append('  Index:  {}'.format(' '.join(map(str, self.index))))
-        lines.append('  Bases:  {}'.format(self.bases))
-        lines.append('  Quals:  {}'.format(' '.join(map(str, self.quals))))
+        lines.append('>{}'.format(self.identifier))
+        lines.append('  Info: \t{}'.format(self.info))
+        lines.append('  Clip: \t{}'.format(' '.join(map(str, self.clip))))
+        lines.append('  Flows:\t{}'.format(' '.join(['{:.2f}'.format(i)
+                                                   for i in self.flows])))
+        lines.append('  Index:\t{}'.format(' '.join(map(str, self.index))))
+        lines.append('  Bases:\t{}'.format(self.bases))
+        lines.append('  Quals:\t{}'.format(' '.join(map(str, self.quals))))
         return '\n'.join(lines)
 
 
@@ -63,6 +67,10 @@ _HEADER_REGEXP = re.compile(r'^\s*>(.*)')
 _LINE_REGEXP = re.compile('^\s*(\w+):\s+(.*)$')
 
 def _is_header(line):
+    """
+    True if the record is a FlowerRecord header, matching
+    _HEADER_REGEXP.
+    """
     return line and _HEADER_REGEXP.match(line)
 
 
@@ -92,7 +100,7 @@ def read_flower(iterable):
             line = next(iterable)
         except StopIteration:
             yield record
-            raise StopIteration()
+            break
         if _is_header(line):
             yield record
             record = FlowerRecord(_HEADER_REGEXP.match(line).group(1))
