@@ -42,6 +42,7 @@ def is_flowgram_valid(flowgram, high_signal_cutoff=9.49,
 
     return noisy == 0 and signal > 0
 
+
 def trim_noise(flows):
     """
     Trims flows to the first noisy flowgram found
@@ -61,6 +62,7 @@ def trim_noise(flows):
 
     # No invalid flowgrams found: return the whole sequence
     return flows
+
 
 def handle_record(flows, primer_re, min_flows, max_flows):
     """
@@ -113,7 +115,7 @@ def invoke(reader, fa_handle, dat_path, primer, min_flows, max_flows):
                                                        sequence)
                 # Write data
                 print >> dat_handle, record.identifier, len(flows),
-                print >> dat_handle, ' '.join(map(str, flows))
+                print >> dat_handle, ' '.join(map('{:.2f}'.format, flows))
                 good += 1
             else:
                 bad += 1
@@ -122,13 +124,10 @@ def invoke(reader, fa_handle, dat_path, primer, min_flows, max_flows):
         print '{0} good records, {1} bad records'.format(good, bad)
 
         # Second pass - add a line with number clean and maximum length
-        # to the dat file
-        dat_path = dat_handle.name
-
-        # Copy from temp file to final file
         dat_handle.seek(0)
         with open(dat_path, 'w') as dat_fp:
             print >> dat_fp, good, max_flows
+            # Copy from temp file to final file
             shutil.copyfileobj(dat_handle, dat_fp)
 
 
