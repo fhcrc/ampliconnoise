@@ -76,6 +76,28 @@ class TestFlowerReader(unittest.TestCase):
         self.assertEquals(['FTWCYXX01BTPDQ', 'FTWCYXX01B0TTO'],
                           [record.identifier for record in records])
 
+    def test_invalid_key(self):
+        text_record = ">TEST_ID\n   Invalid: \t0 0 0 0 0"
+        reader = flower.read_flower(iter(text_record.splitlines()))
+        self.assertRaises(ValueError, next, reader)
+
+    def test_duplicate_key(self):
+        # Duplicate a line
+        self.test_iter.insert(2, self.test_iter[2])
+        reader = flower.read_flower(iter(self.test_iter))
+        with self.assertRaises(ValueError) as cm:
+            next(reader)
+        exception = cm.exception
+        self.assertTrue(str(exception).startswith('Clip already set:'))
+
+    def test_validate(self):
+        self.test_iter.pop(2)
+        self.test_iter.pop(3)
+        reader = flower.read_flower(iter(self.test_iter))
+        with self.assertRaises(ValueError) as cm:
+            next(reader)
+        self.assertEquals("Missing attribute(s): clip, index", str(cm.exception))
+
 class TestFlowerRecord(unittest.TestCase):
     def setUp(self):
         self.text_record = """>FTWCYXX01BTPDQ

@@ -75,6 +75,17 @@ class FlowerRecord(object):
                 identifier=self.identifier, length=len(self.flows),
                 flow=self._flow_to_string())
 
+    def validate(self):
+        """
+        Makes sure all attributes are set
+        """
+        failures = []
+        for i in FlowerRecord.__slots__:
+            if getattr(self, i, None) is None:
+                failures.append(i)
+        if failures:
+            raise ValueError("Missing attribute(s): {0}".format(', '.join(failures)))
+
 
 # Matches read headers in flower output
 _HEADER_REGEXP = re.compile(r'^\s*>(.*)')
@@ -117,9 +128,11 @@ def read_flower(iterable):
         try:
             line = next(iterable)
         except StopIteration:
+            record.validate()
             yield record
             break
         if _is_header(line):
+            record.validate()
             yield record
             record = FlowerRecord(_HEADER_REGEXP.match(line).group(1))
         m = _LINE_REGEXP.match(line)
@@ -130,8 +143,8 @@ def read_flower(iterable):
 
         try:
             if getattr(record, key.lower(), None) is not None:
-                raise ValueError("{0} already set: {1}",
-                                 getattr(record, key.lower()))
+                raise ValueError("{0} already set: {1}".format(key,
+                        getattr(record, key.lower())))
             else:
                 setattr(record, key.lower(), key_handlers[key](value))
         except KeyError:
