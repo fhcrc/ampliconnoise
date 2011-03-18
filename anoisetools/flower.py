@@ -50,13 +50,13 @@ class FlowerRecord(object):
         """
         # TODO: make this a little less repetitive
         lines = []
-        lines.append('>{}'.format(self.identifier))
-        lines.append('  Info: \t{}'.format(self.info))
-        lines.append('  Clip: \t{}'.format(' '.join(map(str, self.clip))))
-        lines.append('  Flows:\t{}'.format(self._flow_to_string()))
-        lines.append('  Index:\t{}'.format(' '.join(map(str, self.index))))
-        lines.append('  Bases:\t{}'.format(self.bases))
-        lines.append('  Quals:\t{}'.format(' '.join(map(str, self.quals))))
+        lines.append('>{0}'.format(self.identifier))
+        lines.append('  Info: \t{0}'.format(self.info))
+        lines.append('  Clip: \t{0}'.format(' '.join(map(str, self.clip))))
+        lines.append('  Flows:\t{0}'.format(self._flow_to_string()))
+        lines.append('  Index:\t{0}'.format(' '.join(map(str, self.index))))
+        lines.append('  Bases:\t{0}'.format(self.bases))
+        lines.append('  Quals:\t{0}'.format(' '.join(map(str, self.quals))))
         return '\n'.join(lines)
 
     def _flow_to_string(self):
@@ -71,8 +71,9 @@ class FlowerRecord(object):
         consisting of the identifier, a newline, the integer length of the
         flow, a space, and the float flow readings.
         """
-        return '>{identifier}\n{length} {flow}'.format(identifier=self.identifier,
-                length=len(self.flows), flow=self._flow_to_string())
+        return '>{identifier}\n{length} {flow}'.format(
+                identifier=self.identifier, length=len(self.flows),
+                flow=self._flow_to_string())
 
 
 # Matches read headers in flower output
@@ -91,14 +92,16 @@ def _is_header(line):
 def read_flower(iterable):
     """
     Reads an input containing lines from a flower sff.txt output,
-    returning a generator yielding FlowerRecords
+    returning a generator of FlowerRecords contained in the input.
     """
     header = next(iterable)
     if not _is_header(header):
-        raise ValueError("Invalid record identifier: {}".format(header))
+        raise ValueError("Invalid record identifier: {0}".format(header))
 
     # Populate key handlers - each is a function taking a value,
     # Returning the value to set the lower case attribute on the record
+    # e.g. key_handlers['Info'] sets record.info when the Info: key is
+    # is found
     key_handlers = {}
     key_handlers['Info'] = lambda value: value
     key_handlers['Bases'] = key_handlers['Info']
@@ -109,6 +112,7 @@ def read_flower(iterable):
 
     record = FlowerRecord(_HEADER_REGEXP.match(header).group(1))
 
+    # Iterate over the input, building records
     while True:
         try:
             line = next(iterable)
@@ -131,4 +135,4 @@ def read_flower(iterable):
             else:
                 setattr(record, key.lower(), key_handlers[key](value))
         except KeyError:
-            raise ValueError("Unknown key: {}".format(key))
+            raise ValueError("Unknown key: {0}".format(key))
