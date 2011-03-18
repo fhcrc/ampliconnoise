@@ -53,12 +53,26 @@ class FlowerRecord(object):
         lines.append('>{}'.format(self.identifier))
         lines.append('  Info: \t{}'.format(self.info))
         lines.append('  Clip: \t{}'.format(' '.join(map(str, self.clip))))
-        lines.append('  Flows:\t{}'.format(' '.join(['{:.2f}'.format(i)
-                                                   for i in self.flows])))
+        lines.append('  Flows:\t{}'.format(self._flow_to_string()))
         lines.append('  Index:\t{}'.format(' '.join(map(str, self.index))))
         lines.append('  Bases:\t{}'.format(self.bases))
         lines.append('  Quals:\t{}'.format(' '.join(map(str, self.quals))))
         return '\n'.join(lines)
+
+    def _flow_to_string(self):
+        """
+        Converts the flow floats to a string
+        """
+        return ' '.join(('{:.2f}'.format(i) for i in self.flows))
+
+    def to_anoise_raw(self):
+        """
+        Generates a string suitable for using as input to Ampiclonnoise,
+        consisting of the identifier, a newline, the integer length of the
+        flow, a space, and the float flow readings.
+        """
+        return '>{identifier}\n{length} {flow}'.format(identifier=self.identifier,
+                length=len(self.flows), flow=self._flow_to_string())
 
 
 # Matches read headers in flower output
