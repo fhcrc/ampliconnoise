@@ -37,8 +37,7 @@ class TestFlowgramValid(unittest.TestCase):
 class TestHandleRecord(unittest.TestCase):
 
     def setUp(self):
-        record = flower.FlowerRecord('Test Record')
-        record.flows = [1.03, 0.00, 1.05, 0.01, 0.03, 0.99, 0.05, 0.93, 0.04,
+        self.flows = [1.03, 0.00, 1.05, 0.01, 0.03, 0.99, 0.05, 0.93, 0.04,
                 0.95, 0.04, 0.99, 1.00, 0.00, 0.99, 0.03, 1.01, 0.00, 0.96,
                 0.01, 0.06, 2.93, 0.04, 0.01, 2.08, 0.03, 0.05, 2.93, 0.09,
                 0.00, 2.05, 0.09, 1.04, 0.04, 0.08, 1.03, 0.05, 4.00, 0.07,
@@ -89,18 +88,16 @@ class TestHandleRecord(unittest.TestCase):
                 0.95, 0.16, 0.13, 1.06, 0.08, 0.09, 2.02, 0.15, 0.08, 0.93,
                 1.20, 0.11, 0.15, 2.01, 0.15, 2.13, 0.04, 0.14, 1.03, 0.07,
                 0.89, 0.08, 1.01, 0.20, 0.94, 1.09, 0.96, 0.14]
-        self.record = record
 
     def tearDown(self):
         pass
 
     def test_min_length(self):
-        record = self.record
-        assert len(record.flows) >= 400
+        assert len(self.flows) >= 400
 
         regex = re.compile('^TCAG.*?(A.*)')
-        actual = cleanminmax.handle_record(record, regex, 400, 600)
+        actual = cleanminmax.handle_record(self.flows, regex, 400, 600)
         self.assertTrue(actual[0] is not None)
         self.assertTrue(actual[1] is not None)
 
-        self.fail(actual)
+        self.fail("Check results")

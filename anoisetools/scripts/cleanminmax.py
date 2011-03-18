@@ -40,14 +40,20 @@ def is_flowgram_valid(flowgram, high_signal_cutoff=9.49,
 
     return noisy == 0 and signal > 0
 
-def handle_record(record, primer_re, min_length, max_length):
+def handle_record(flows, primer_re, min_length, max_length):
     """
-    Processes a record
+    Processes a record, checks for validity and returns the result
 
-    primer_re should return a single group containing the primer
+    primer_re must return a single group containing the primer
     and remainder of the sequence
+
+    If the record has good data and meets the min_length requirement:
+    Returns a length-2 tuple containing the sequence to be
+    written to the FASTA file, and a set of flows trimmed to
+    MAX_ANOISE_LENGTH.
+
+    Otherwise, returns ``(None, None)``
     """
-    flows = record.flows
     flow_length = len(flows)
     flowgram_size = 4
 
@@ -78,11 +84,15 @@ def handle_record(record, primer_re, min_length, max_length):
 
 
 def invoke(reader, fa_handle, dat_handle, primer, min_length, max_length):
+    """
+    Main routine. Loop over the records in reader, write good results to
+    fa_handle and dat_handle respectively.
+    """
     good = 0
     bad = 0
     primer_re = re.compile(r'^TCAG.*({0}.*)'.format(primer))
     for record in reader:
-        sequence, flows = handle_record(record, primer_re, min_length,
+        sequence, flows = handle_record(record.flows, primer_re, min_length,
                                         max_length)
         if sequence and flows:
             # Write FASTA
@@ -97,6 +107,9 @@ def invoke(reader, fa_handle, dat_handle, primer, min_length, max_length):
 
 
 def main(args=sys.argv[1:]):
+    """
+    Check arguments, call invoke(...)
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument('--min-length', type=int,
             help="Minimum length to accept sequence"
