@@ -76,3 +76,26 @@ class TestFlowerReader(unittest.TestCase):
         self.assertEquals(['FTWCYXX01BTPDQ', 'FTWCYXX01B0TTO'],
                           [record.identifier for record in records])
 
+class TestFlowerRecord(unittest.TestCase):
+    def setUp(self):
+        self.text_record = """  >FTWCYXX01BTPDQ
+  Info:   2009-04-08 11:31:35 R1 (631,1068)
+  Clip:   5 282
+  Flows:  1.04 0.01 1.02 0.07 0.05 0.97 0.06 2.00 0.96 1.09 0.98 0.08 0.02 1.18
+  Index:  1 3 6 8 8 9 10 11 14 16 18 18 18 18 18 21 21 23 23 23 23 25 27 27 27 3
+  Bases:  tcagGTACAGAAAAATTCCCCTCCCAATTAAAACTATGTGATGTGATTTCTATGTCCCCTCCTGAGGGTT
+  Quals:  37 37 37 37 37 37 37 37 38 34 20 20 20 20 15 34 34 37 37 37 37 38 34 3"""
+        self.reader = flower.read_flower(iter(self.text_record.splitlines()))
+        self.record = next(self.reader)
+
+    def test_str(self):
+        actual = str(self.record)
+        actual_lines = actual.splitlines()
+        expected_lines = self.text_record.splitlines()
+
+        self.assertEquals(len(expected_lines), len(actual_lines),
+                          msg="Line counts should match")
+
+        for expected_line, actual_line in zip(expected_lines, actual_lines):
+            self.assertEquals(expected_line, actual_line)
+
