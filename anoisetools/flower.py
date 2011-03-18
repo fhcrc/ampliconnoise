@@ -3,6 +3,7 @@ Tools for working with raw flower output.
 """
 
 import itertools
+import math
 import re
 
 # Sequence in which nucleotides are flowed:
@@ -21,7 +22,8 @@ def flow_to_seq(flowgram, flow_order=FLOW_ORDER):
     result = []
     for read_value, base in zip(flowgram, bases):
         # Round to the nearest value
-        signal = int(read_value + 0.5)
+        signal = int(math.floor(read_value + 0.5))
+        print '{:.2f}'.format(read_value), signal, base
         #signal = int(round(read_value, 0))
         result.extend([base] * signal)
 

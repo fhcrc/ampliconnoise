@@ -48,8 +48,6 @@ def trim_noise(flows):
     """
     flowgram_size = 4
 
-    stop = len(flows)
-
     # Iterate through the reads in groups of 4,
     # Making sure that there's
     # A) 1+ with signal above threshold
@@ -58,10 +56,11 @@ def trim_noise(flows):
         flowgram = flows[i:i + flowgram_size]
 
         if not is_flowgram_valid(flowgram):
-            stop = i
-            break
+            # Return all data up to this point
+            return flows[:i]
 
-    return flows[:stop]
+    # No invalid flowgrams found: return the whole sequence
+    return flows
 
 def handle_record(flows, primer_re, min_flows, max_flows):
     """
@@ -82,10 +81,9 @@ def handle_record(flows, primer_re, min_flows, max_flows):
 
     trimmed_flows = trim_noise(flows)
     trimmed_reading = flower.flow_to_seq(trimmed_flows)
-    print trimmed_reading
 
     m = primer_re.match(trimmed_reading)
-    if (min_flows is None or trimmed_length >= min_flows) and m:
+    if (min_flows is None or len(trimmed_flows) >= min_flows) and m:
         sequence = m.group(1)
 
         # Truncate the flow result to a maximum length
@@ -107,7 +105,6 @@ def invoke(reader, fa_handle, dat_path, primer, min_flows, max_flows):
     primer_re = re.compile(r'^TCAG.*({0}.*)'.format(primer))
     with tempfile.TemporaryFile() as dat_handle:
         for record in reader:
-            print record.identifier,
             sequence, flows = handle_record(record.flows, primer_re, min_flows,
                                             max_flows)
             if sequence and flows:
