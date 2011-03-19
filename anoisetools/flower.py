@@ -3,6 +3,7 @@ Tools for working with raw flower output.
 """
 
 import itertools
+import math
 import re
 
 # Sequence in which nucleotides are flowed:
@@ -21,7 +22,7 @@ def flow_to_seq(flowgram, flow_order=FLOW_ORDER):
     result = []
     for read_value, base in zip(flowgram, bases):
         # Round to the nearest value
-        signal = int(round(read_value, 0))
+        signal = int(math.floor(read_value + 0.5))
         result.extend([base] * signal)
 
     return ''.join(result)
@@ -58,6 +59,16 @@ class FlowerRecord(object):
         lines.append('  Bases:\t{0}'.format(self.bases))
         lines.append('  Quals:\t{0}'.format(' '.join(map(str, self.quals))))
         return '\n'.join(lines)
+
+    def _flow_to_string(self):
+        """
+        Converts the flow floats to a string
+        """
+        return ' '.join(('{:.2f}'.format(i) for i in self.flows))
+
+    @property
+    def right_trim(self):
+        return self.clip[1]
 
     def to_anoise_raw(self):
         """
