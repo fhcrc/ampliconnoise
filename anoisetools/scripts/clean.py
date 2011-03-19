@@ -156,7 +156,7 @@ def main(args=sys.argv[1:]):
 
     try:
         if parsed.anoise_input:
-            reader = anoiseio.splitkeys_reader(parsed.input)
+            reader = anoiseio.SplitKeysReader(parsed.input)
         else:
             reader = flower.read_flower(parsed.input)
         with open(parsed.outname + '.fa', 'w') as fasta_handle:

@@ -4,7 +4,7 @@ Tools for reading Ampiclonnoise outputs
 
 from anoisetools import flower
 
-def splitkeys_reader(fp):
+class SplitKeysReader(object):
     """
     Reader for the output of ampiclonnoise SplitKeys*.pl scripts,
     which consist of a row with:
@@ -16,14 +16,22 @@ def splitkeys_reader(fp):
 
     Record length is truncated to flow_count
     """
-    fp = (i.rstrip('\n') for i in fp)
-    header = next(fp)
-    while True:
-        header = next(fp)[1:]
-        split_line = next(fp).split()
-        flow_length = int(split_line[0])
-        flows = split_line[1:flow_length + 1]
-        flows = map(float, flows)
-        record = flower.FlowerRecord(header)
-        record.flows = flows
-        yield record
+    def __init__(self, fp):
+        self._fp = (i.rstrip('\n') for i in fp)
+        header = next(self._fp)
+        count, barcode, fname = header.split(None, 2)
+        self.count = int(count)
+        self.barcode = barcode
+        self.fname = fname
+
+    def __iter__(self):
+        while True:
+            header = next(self._fp)[1:]
+            split_line = next(self._fp).split()
+            flow_length = int(split_line[0])
+            flows = split_line[1:flow_length + 1]
+            flows = map(float, flows)
+            record = flower.FlowerRecord(header)
+            record.flows = flows
+            yield record
+
