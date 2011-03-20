@@ -7,8 +7,12 @@
 #  - Write results to appropriate output file
 
 import collections
+import contextlib
 import csv
 import re
+import sys
+
+from anoisetools import sff
 
 def _load_barcodes(fp):
     """
@@ -48,7 +52,7 @@ def _close_all(files):
             len(exceptions), exceptions))
 
 
-class SFFFlowerSplitter(object):
+class SFFRunSplitter(object):
 
     def __init__(self, barcode_map, primer, dest_dir, unmatched_dest):
         """
@@ -68,7 +72,7 @@ class SFFFlowerSplitter(object):
         self.unmatched_dest = unmatched_dest
         self._handles = None
 
-    def _open(self):
+    def open(self):
         """
         Opens files for each barcode, stores in handles
         """
@@ -119,3 +123,51 @@ class SFFFlowerSplitter(object):
             counts[barcode] += 1
 
         return counts
+
+def main(args=sys.argv[1:]):
+    """
+    Command-line functionality
+
+    * parse arguments
+    * read barcodes
+    * run
+    """
+    parser = argparse.ArgumentParser()
+
+    # Required arguments
+    parser.add_argument('barcode_file', metavar='BARCODE_FILE',
+            type=argparse.FileType('r'),
+            help='Path to barcode file with barcode_id,barcode_seq pairs')
+    parser.add_argument('primer', metavar='PRIMER',
+            help='Regular expression identifying the primer used')
+
+    # Optional arguments
+    parser.add_argument('--sff-file', metavar='SFF_TXT', default=sys.stdin,
+            type=argparse.FileType('r'),
+            help='Flower-decoded SFF text file. Default: stdin')
+    parser.add_argument('--output-directory', metavar='DIR',
+            default='split', help='Output directory for split files')
+    parser.add_argument('--unmatched-name', default='unmatched',
+            help='Name for file containing unmatched records. '
+                 'Default: %(default)s)')
+
+    parsed = parser.parse_args(args)
+
+    # Split barcodes
+    with parsed.barcode_file:
+        barcodes = _load_barcodes(parsed.barcode_file)
+
+    splitter = SFFRunSplitter(barcodes, parsed.primer,
+            parsed.output_directory, parsed.unmatched_name)
+    with contextlib.closing(splitter):
+        splitter.open()
+        with parsed.sff_file:
+            reader = sff.parse_flower(parsed.sff_file)
+            result = splitter.split(reader)
+
+    unmatched = result[None]
+    del result[None]
+    items = sorted(result.items())
+    for k, v in items:
+        print 'Barcode {0}: {1:5d} records'.format(k, v)
+    print 'Unmatched:', unmatched, 'records'
