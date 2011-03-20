@@ -16,7 +16,7 @@ def _load_barcodes(fp):
 
     Raises a ValueError on duplicate key *or* value.
 
-    fp should contain (at least) sequence_identifier, barcode sequence
+    fp should contain (at least) sequence_identifier,barcode_sequence
     pairs.
     """
     reader = csv.reader(fp)
@@ -34,7 +34,7 @@ def _load_barcodes(fp):
 
 def _close_all(files):
     """
-    Closes all files
+    Closes an iterable of files, aggregating any exceptions
     """
     exceptions = []
     for f in files:
