@@ -8,11 +8,26 @@
 
 import csv
 
-def load_barcodes(fp):
+def _load_barcodes(fp):
+    """
+    Read barcodes from fp
+
+    Raises a ValueError on duplicate key *or* value.
+
+    fp should contain (at least) sequence_identifier, barcode sequence
+    pairs.
+    """
     reader = csv.reader(fp)
+    values = set()
     d = {}
     for line in reader:
-        d[line[1]] = line[0]
+        k, v = line[1], line[0]
+        if k in d:
+            raise ValueError("Duplicate barcode: {0}".format(k))
+        if v in values:
+            raise ValueError("Duplicate value: {0}".format(v))
+        d[k] = v
+        values.add(v)
     return d
 
 
