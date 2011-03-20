@@ -8,7 +8,7 @@ import shutil
 import sys
 import tempfile
 
-from anoisetools import flower, anoiseio
+from anoisetools import sff, anoiseio
 
 DEFAULT_MIN_FLOWS = None
 DEFAULT_MAX_FLOWS = 360
@@ -82,7 +82,7 @@ def handle_record(flows, primer_re, min_flows, max_flows):
     flowgram_size = 4
 
     trimmed_flows = trim_noise(flows)
-    trimmed_reading = flower.flow_to_seq(trimmed_flows)
+    trimmed_reading = sff.flow_to_seq(trimmed_flows)
 
     m = primer_re.match(trimmed_reading)
     if (min_flows is None or len(trimmed_flows) >= min_flows) and m:
@@ -148,7 +148,7 @@ def main(args=sys.argv[1:]):
             help="base name for output files - OUTNAME.fa and OUTNAME.dat")
     parser.add_argument('--input', metavar='INPUT', default=sys.stdin,
             type=argparse.FileType('r'),
-            help='Input flower-processed data file (default: stdin)')
+            help='Input sff-processed data file (default: stdin)')
     parser.add_argument('--anoise-input', action='store_true',
             help='Input is in ampiclonnoise raw file format',
             default=False)
@@ -158,7 +158,7 @@ def main(args=sys.argv[1:]):
         if parsed.anoise_input:
             reader = anoiseio.SplitKeysReader(parsed.input)
         else:
-            reader = flower.read_flower(parsed.input)
+            reader = sff.parse_flower(parsed.input)
         with open(parsed.outname + '.fa', 'w') as fasta_handle:
             invoke(reader, fasta_handle, parsed.outname + '.dat',
                    parsed.primer, parsed.min_flows, parsed.max_flows)

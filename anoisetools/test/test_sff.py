@@ -1,7 +1,7 @@
 
 import unittest
 
-from anoisetools import flower
+from anoisetools import sff
 
 class TestFlowToSeq(unittest.TestCase):
 
@@ -10,7 +10,7 @@ class TestFlowToSeq(unittest.TestCase):
         self.test_expected = 'ACGTGGGGG'
 
     def test_flow_to_seq(self):
-        actual = flower.flow_to_seq(self.test_flow)
+        actual = sff.flow_to_seq(self.test_flow)
         self.assertEqual(self.test_expected, actual)
 
 class TestFlowerReader(unittest.TestCase):
@@ -31,7 +31,7 @@ class TestFlowerReader(unittest.TestCase):
   Bases:\ttcagGTACAGAAAAATTCTCCTCTCAATTAAAACTATGTGATGTGATTTCTATGTCCCCTCCTGAGGGTT
   Quals:\t37 37 37 37 37 37 37 37 38 38 28 28 28 28 28 38 38 37 37 37 37 37 40""".splitlines()
 
-        self.reader = flower.read_flower(iter(self.test_iter))
+        self.reader = sff.parse_flower(iter(self.test_iter))
 
     def tearDown(self):
         pass
@@ -78,25 +78,25 @@ class TestFlowerReader(unittest.TestCase):
 
     def test_invalid_key(self):
         self.test_iter.insert(2, '  Invalid:\t0 0 0 0 0')
-        reader = flower.read_flower(iter(self.test_iter))
+        reader = sff.parse_flower(iter(self.test_iter))
         self.assertRaisesRegexp(ValueError, 'Unknown key: Invalid',
                 next, reader)
 
     def test_duplicate_key(self):
         # Duplicate a line
         self.test_iter.insert(2, self.test_iter[2])
-        reader = flower.read_flower(iter(self.test_iter))
+        reader = sff.parse_flower(iter(self.test_iter))
         with self.assertRaisesRegexp(ValueError, '^Clip already set:') as cm:
             next(reader)
 
     def test_validate(self):
         self.test_iter.pop(2)
         self.test_iter.pop(3)
-        reader = flower.read_flower(iter(self.test_iter))
+        reader = sff.parse_flower(iter(self.test_iter))
         with self.assertRaisesRegexp(ValueError, r'^Missing attribute\(s\):') as cm:
             next(reader)
 
-class TestFlowerRecord(unittest.TestCase):
+class TestSFFRecord(unittest.TestCase):
     def setUp(self):
         self.text_record = """>FTWCYXX01BTPDQ
   Info: \t2009-04-08 11:31:35 R1 (631,1068)
@@ -105,7 +105,7 @@ class TestFlowerRecord(unittest.TestCase):
   Index:\t1 3 6 8 8 9 10 11 14 16 18 18 18 18 18 21 21 23 23 23 23 25 27 27 27 3
   Bases:\ttcagGTACAGAAAAATTCCCCTCCCAATTAAAACTATGTGATGTGATTTCTATGTCCCCTCCTGAGGGTT
   Quals:\t37 37 37 37 37 37 37 37 38 34 20 20 20 20 15 34 34 37 37 37 37 38 34 3"""
-        self.reader = flower.read_flower(iter(self.text_record.splitlines()))
+        self.reader = sff.parse_flower(iter(self.text_record.splitlines()))
         self.record = next(self.reader)
 
     def test_str(self):

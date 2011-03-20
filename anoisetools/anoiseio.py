@@ -2,7 +2,7 @@
 Tools for reading Ampiclonnoise outputs
 """
 
-from anoisetools import flower
+from anoisetools import sff
 
 class SplitKeysReader(object):
     """
@@ -31,7 +31,7 @@ class SplitKeysReader(object):
             flow_length = int(split_line[0])
             flows = split_line[1:flow_length + 1]
             flows = map(float, flows)
-            record = flower.FlowerRecord(header)
+            record = sff.SFFRead(header)
             record.flows = flows
             yield record
 

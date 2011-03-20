@@ -16,7 +16,7 @@ def load_barcodes(fp):
     return d
 
 
-class SFFFlowerSplitter(object)u:
+class SFFFlowerSplitter(object):
 
     def __init__(self, barcode_map, primer, dest_dir):
         """

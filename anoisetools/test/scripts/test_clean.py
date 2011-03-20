@@ -7,7 +7,7 @@ import os.path
 import re
 import unittest
 
-from anoisetools import flower
+from anoisetools import sff
 from anoisetools.scripts import clean
 
 

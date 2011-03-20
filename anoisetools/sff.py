@@ -6,6 +6,7 @@ import itertools
 import math
 import re
 
+
 # Sequence in which nucleotides are flowed:
 FLOW_ORDER = 'TACG'
 
@@ -28,9 +29,9 @@ def flow_to_seq(flowgram, flow_order=FLOW_ORDER):
     return ''.join(result)
 
 
-class FlowerRecord(object):
+class SFFRead(object):
     """
-    Flower record
+    SFF Reading
     """
 
     __slots__ = ['identifier', 'info', 'clip',
@@ -85,11 +86,12 @@ class FlowerRecord(object):
         Makes sure all attributes are set
         """
         failures = []
-        for i in FlowerRecord.__slots__:
+        for i in SFFRead.__slots__:
             if getattr(self, i, None) is None:
                 failures.append(i)
         if failures:
-            raise ValueError("Missing attribute(s): {0}".format(', '.join(failures)))
+            raise ValueError("Missing attribute(s): {0}".format(
+                ', '.join(failures)))
 
     @property
     def string_flows(self):
@@ -107,18 +109,20 @@ class FlowerRecord(object):
 
 # Matches read headers in flower output
 _HEADER_REGEXP = re.compile(r'^\s*>(.*)')
+
 # Matches data lines in flower output
 _LINE_REGEXP = re.compile('^\s*(\w+):\s+(.*)$')
 
+
 def _is_header(line):
     """
-    True if the record is a FlowerRecord header, matching
+    True if the record is a SFFRead header, matching
     _HEADER_REGEXP.
     """
     return line and _HEADER_REGEXP.match(line)
 
 
-def read_flower(iterable):
+def parse_flower(iterable):
     """
     Reads an input containing lines from a flower sff.txt output,
     returning a generator of FlowerRecords contained in the input.
@@ -140,9 +144,9 @@ def read_flower(iterable):
     key_handlers['Quals'] = key_handlers['Clip']
     key_handlers['Flows'] = lambda value: map(float, value.split())
 
-    record = FlowerRecord(_HEADER_REGEXP.match(header).group(1))
+    record = SFFRead(_HEADER_REGEXP.match(header).group(1))
 
-    # Iterate over the input, building records
+    # Iterate over the input, generating records
     while True:
         try:
             line = next(iterable)
@@ -151,9 +155,10 @@ def read_flower(iterable):
             yield record
             break
         if _is_header(line):
+            # new record in input - validate and yield the current
             record.validate()
             yield record
-            record = FlowerRecord(_HEADER_REGEXP.match(line).group(1))
+            record = SFFRead(_HEADER_REGEXP.match(line).group(1))
         m = _LINE_REGEXP.match(line)
         if not m:
             # Ignore blank lines for now
