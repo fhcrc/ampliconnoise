@@ -8,7 +8,7 @@ import shutil
 import sys
 import tempfile
 
-from anoisetools import sff, anoiseio
+from ampiclonnoise import sff, anoiseio
 
 DEFAULT_MIN_FLOWS = None
 DEFAULT_MAX_FLOWS = 360

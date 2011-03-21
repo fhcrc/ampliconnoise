@@ -3,7 +3,7 @@ import shutil
 import tempfile
 import unittest
 
-from anoisetools.scripts import split
+from ampiclonnoise.scripts import split
 
 def _line_iterator(s):
     return iter(s.splitlines())

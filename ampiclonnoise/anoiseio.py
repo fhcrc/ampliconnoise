@@ -2,7 +2,7 @@
 Tools for reading Ampiclonnoise outputs
 """
 
-from anoisetools import sff
+from ampiclonnoise import sff
 
 class SplitKeysReader(object):
     """

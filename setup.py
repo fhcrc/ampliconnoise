@@ -3,11 +3,11 @@
 import glob
 from distutils.core import setup
 
-setup(name = 'anoisetools',
+setup(name = 'ampiclonnoise',
       version = '0.1',
       author = 'Connor McCoy',
       author_email = 'cmccoy@fhcrc.org',
-      packages = ['anoisetools', 'anoisetools.test'],
+      packages = ['ampiclonnoise', 'ampiclonnoise.test'],
       requires = ['Python (>= 2.7)'],
       scripts = ['scripts/anoise_clean', 'scripts/anoise_split'],
       )

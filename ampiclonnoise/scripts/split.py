@@ -26,7 +26,7 @@ import os.path
 import re
 import sys
 
-from anoisetools import sff
+from ampiclonnoise import sff
 
 
 def _load_barcodes(fp):
@@ -126,7 +126,7 @@ class SFFRunSplitter(object):
 
     def split(iterable):
         """
-        Takes an iterable generating :ref:`anoisetools.sff.SFFRead`s,
+        Takes an iterable generating :ref:`ampiclonnoise.sff.SFFRead`s,
         writes them to a set of output files
         returns a dictionary of mapping barcode -> # of reads
         """
