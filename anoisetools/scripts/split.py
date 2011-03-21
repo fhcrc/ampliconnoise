@@ -1,10 +1,22 @@
+"""
+``split``
+=========
 
-# Class
-#  - Read barcode file
-#  - Generate list of file descriptors
-#  - Read flower input
-#  - Find a destination based on barcode and primer
-#  - Write results to appropriate output file
+.sff.txt splitter by barcode.
+
+Given the input:
+
+  * A text-converted Standard Flowgram File
+  * A file containing mappings from DNA sequence barcodes to a meaningful
+    identifier
+  * A regular expression to identify the primer sequence used
+
+Writes to a series of files named after the meaningful identifiers provided,
+each containing only those sequences from the input sff with the matching
+barcode.
+
+Any unmatched sequences are written to a separate file
+"""
 
 import collections
 import contextlib
@@ -13,6 +25,7 @@ import re
 import sys
 
 from anoisetools import sff
+
 
 def _load_barcodes(fp):
     """
@@ -74,7 +87,7 @@ class SFFRunSplitter(object):
 
     def open(self):
         """
-        Opens files for each barcode, stores in handles
+        Opens file handles for each barcode, in preparation for writing.
         """
         if self._handles:
             raise IOError("Already initialized with {0} handles".format(
@@ -124,6 +137,7 @@ class SFFRunSplitter(object):
 
         return counts
 
+
 def main(args=sys.argv[1:]):
     """
     Command-line functionality
@@ -157,16 +171,18 @@ def main(args=sys.argv[1:]):
     with parsed.barcode_file:
         barcodes = _load_barcodes(parsed.barcode_file)
 
-    splitter = SFFRunSplitter(barcodes, parsed.primer,
-            parsed.output_directory, parsed.unmatched_name)
+    splitter = SFFRunSplitter(barcodes, parsed.primer, parsed.output_directory,
+                              parsed.unmatched_name)
     with contextlib.closing(splitter):
         splitter.open()
         with parsed.sff_file:
             reader = sff.parse_flower(parsed.sff_file)
             result = splitter.split(reader)
 
+    # Special treatment for unmatched records
     unmatched = result[None]
     del result[None]
+
     items = sorted(result.items())
     for k, v in items:
         print 'Barcode {0}: {1:5d} records'.format(k, v)
