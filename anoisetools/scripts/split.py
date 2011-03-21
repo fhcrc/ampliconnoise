@@ -21,6 +21,7 @@ Any unmatched sequences are written to a separate file
 import collections
 import contextlib
 import csv
+import os.path
 import re
 import sys
 
@@ -92,25 +93,23 @@ class SFFRunSplitter(object):
         if self._handles:
             raise IOError("Already initialized with {0} handles".format(
                      len(self._handles)))
+        self._handles = {}
 
         for barcode, name in self.barcode_map.items():
-            outpath = os.path.join(self.dest_dir, name)
+            fname = name + '.raw'
+            outpath = os.path.join(self.dest_dir, fname)
             self._handles[barcode] = open(outpath, 'w')
 
         # Create a default handle
         default_outpath = os.path.join(self.dest_dir, self.unmatched_dest)
-        self._handles[None] = open(default_outpath, 'w')
+        self._handles[None] = open(default_outpath + '.raw', 'w')
 
     def close(self):
         """
         Closes all open file handles
         """
-        try:
+        if self._handles is not None:
             _close_all(self._handles.values())
-            self._handles = None
-        finally:
-            self._default_handle.close()
-            self._default_handle = None
 
     def _handle_record(record):
         """
