@@ -94,7 +94,10 @@ class SFFRunSplitter(object):
         """
         self.barcode_map = barcode_map
         self.primer = primer
-        self._barcode_re = re.compile(r'TCAG(\w+){0}'.format(primer),
+        min_barcode_length = min(len(k) for k in self.barcode_map)
+        max_barcode_length = max(len(k) for k in self.barcode_map)
+        self._barcode_re = re.compile(r'TCAG(\w{{{0},{1}}}){2}'.format(
+            min_barcode_length, max_barcode_length, primer),
                                       re.IGNORECASE)
         self.dest_dir = dest_dir
         _makedirs(dest_dir)
