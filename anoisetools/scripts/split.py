@@ -18,6 +18,7 @@ barcode.
 Any unmatched sequences are written to a separate file
 """
 
+import argparse
 import collections
 import contextlib
 import csv
