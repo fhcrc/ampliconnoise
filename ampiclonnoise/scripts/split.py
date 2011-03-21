@@ -22,11 +22,24 @@ import argparse
 import collections
 import contextlib
 import csv
+import errno
+import os
 import os.path
 import re
 import sys
 
 from ampiclonnoise import sff
+
+
+def _makedirs(d):
+    """
+    Make all directories to leaf dir ``d``
+    """
+    try:
+        os.makedirs(d)
+    except OSError, e:
+        if not e.errno == errno.EEXIST:
+            raise e
 
 
 def _load_barcodes(fp):
@@ -84,6 +97,7 @@ class SFFRunSplitter(object):
         self._barcode_re = re.compile(r'TCAG(\w+){0}'.format(primer),
                                       re.IGNORECASE)
         self.dest_dir = dest_dir
+        _makedirs(dest_dir)
         self.unmatched_dest = unmatched_dest
         self._handles = None
 
@@ -112,7 +126,7 @@ class SFFRunSplitter(object):
         if self._handles is not None:
             _close_all(self._handles.values())
 
-    def _handle_record(record):
+    def _handle_record(self, record):
         """
         Identifies the barcode in the record, writes the record
         to the appropriate outfile, and returns the barcode
@@ -120,11 +134,11 @@ class SFFRunSplitter(object):
         bases = record.bases_from_flows()
         m = self._barcode_re.match(bases)
         barcode = m.group(1) if m else None
-        fp = self._handles[barcode]
+        fp = self._handles.get(barcode, self._handles[None])
         print >> fp, record
         return barcode
 
-    def split(iterable):
+    def split(self, iterable):
         """
         Takes an iterable generating :ref:`ampiclonnoise.sff.SFFRead`s,
         writes them to a set of output files
