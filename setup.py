@@ -9,5 +9,5 @@ setup(name = 'ampiclonnoise',
       author_email = 'cmccoy@fhcrc.org',
       packages = ['ampiclonnoise', 'ampiclonnoise.test'],
       requires = ['Python (>= 2.7)'],
-      scripts = ['scripts/anoise_clean', 'scripts/anoise_split'],
+      scripts = ['scripts/anoise-clean', 'scripts/anoise-split'],
       )
