@@ -165,9 +165,9 @@ class SFFRunSplitter(object):
             counts[barcode] += 1
 
         if barcode in self._handles:
-            count[barcode] += 1
+            counts[barcode] += 1
         else:
-            unmatched_count[barcode] += 1
+            unmatched_counts[barcode] += 1
 
         return counts
 
