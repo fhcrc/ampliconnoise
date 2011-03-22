@@ -61,12 +61,6 @@ class SFFRead(object):
         lines.append('  Quals:\t{0}'.format(' '.join(map(str, self.quals))))
         return '\n'.join(lines)
 
-    def _flow_to_string(self):
-        """
-        Converts the flow floats to a string
-        """
-        return ' '.join(('{:.2f}'.format(i) for i in self.flows))
-
     @property
     def right_trim(self):
         return self.clip[1]
@@ -111,7 +105,7 @@ class SFFRead(object):
         Returns the float flows as a list of properly formatted strings
         (2 decimal places)
         """
-        return ['{:.2f}'.format(i) for i in self.flows]
+        return ['{0:.2f}'.format(i) for i in self.flows]
 
     def _flow_to_string(self):
         """

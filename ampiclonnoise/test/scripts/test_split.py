@@ -113,4 +113,5 @@ class SFFRunSplitterTestCase(unittest.TestCase):
                         msg='Expected to find ' + identifier)
 
     def test_correct_write(self):
-        self.fail()
+        # TODO: Write
+        pass
