@@ -1,9 +1,4 @@
 """
-``split``
-=========
-
-.sff.txt splitter by barcode.
-
 Given the input:
 
   * A text-converted Standard Flowgram File
@@ -163,7 +158,9 @@ def main(args=sys.argv[1:]):
     * read barcodes
     * run
     """
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(epilog=__doc__,
+            description="sff.txt splitter",
+            formatter_class=argparse.RawDescriptionHelpFormatter)
 
     # Required arguments
     parser.add_argument('barcode_file', metavar='BARCODE_FILE',

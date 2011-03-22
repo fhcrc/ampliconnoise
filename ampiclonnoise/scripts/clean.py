@@ -24,7 +24,8 @@ def is_flowgram_valid(flowgram, high_signal_cutoff=9.49,
 
     # Check arguments
     if len(flowgram) > 4:
-        raise ValueError("Unexpected flowgram length: {0}".format(len(flowgram)))
+        raise ValueError("Unexpected flowgram length: {0}".format(
+            len(flowgram)))
 
     # Number of noisy reads
     noisy = 0
@@ -135,7 +136,9 @@ def main(args=sys.argv[1:]):
     """
     Check arguments, call invoke(...)
     """
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="""Clean flowgrams prior to
+processing with AmpiclonNoise: enforce minimum length, remove invalid data,
+trim.""")
     parser.add_argument('--min-flows', type=int,
             help="Minimum length to accept sequence"
             " default: %(default)s", default=DEFAULT_MIN_FLOWS)
