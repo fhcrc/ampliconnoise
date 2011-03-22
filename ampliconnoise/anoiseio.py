@@ -1,14 +1,14 @@
 """
-Tools for reading Ampiclonnoise outputs
+Tools for reading Ampliconnoise outputs
 """
 import shutil
 import tempfile
 
-from ampiclonnoise import sff
+from ampliconnoise import sff
 
 class AnoiseRawReader(object):
     """
-    Reader for Ampiclonnoise .raw files,
+    Reader for AmpliconNoise .raw files,
     which consist of a row with:
     record_count key_barcode file_name
     >id
@@ -39,7 +39,7 @@ class AnoiseRawReader(object):
 
 def _record_to_anoise_raw(record):
     """
-    Generates a string suitable for using as input to Ampiclonnoise,
+    Generates a string suitable for using as input to AmpliconNoise,
     consisting of the identifier, a newline, the integer length of the
     flow, a space, and the float flow readings.
     """
@@ -49,7 +49,7 @@ def _record_to_anoise_raw(record):
 
 class AnoiseRawWriter(object):
     """
-    Writer for AmpiclonNoise .raw files
+    Writer for AmpliconNoise .raw files
 
     .raw files require a row at the top with a count of records.
     To get around that, this class writes to a temporary file, then

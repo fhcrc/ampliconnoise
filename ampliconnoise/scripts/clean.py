@@ -9,7 +9,7 @@ Clean sff.txt or anoise raw data file:
     * Only accept sequences with a defined minimum length
 
 Creating an output .fasta and a .dat file, suitable for feeding into the
-AmpiclonNoise C code.
+AmpliconNoise C code.
 """
 
 import argparse
@@ -18,7 +18,7 @@ import shutil
 import sys
 import tempfile
 
-from ampiclonnoise import sff, anoiseio
+from ampliconnoise import sff, anoiseio
 
 DEFAULT_MIN_FLOWS = None
 DEFAULT_MAX_FLOWS = 360
@@ -150,7 +150,7 @@ def main(args=sys.argv[1:]):
     Check arguments, call invoke(...)
     """
     parser = argparse.ArgumentParser(description="""Clean flowgrams prior to
-processing with AmpiclonNoise: enforce minimum length, remove invalid data,
+processing with AmpliconNoise: enforce minimum length, remove invalid data,
 trim.""")
     parser.add_argument('--min-flows', type=int,
             help="Minimum length to accept sequence"

@@ -18,7 +18,7 @@ def flow_to_seq(flowgram, flow_order=FLOW_ORDER):
     """
     Takes a list of float flow results and transforms them to a sequence
 
-    Taken from Chris Quince's Ampiclonnoise perl script
+    Taken from Chris Quince's AmpliconNoise perl script
     """
 
     bases = itertools.cycle(flow_order)

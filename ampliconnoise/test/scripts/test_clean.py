@@ -7,8 +7,8 @@ import os.path
 import re
 import unittest
 
-from ampiclonnoise import sff
-from ampiclonnoise.scripts import clean
+from ampliconnoise import sff
+from ampliconnoise.scripts import clean
 
 
 class TestFlowgramValid(unittest.TestCase):

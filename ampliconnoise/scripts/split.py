@@ -22,7 +22,7 @@ import os.path
 import re
 import sys
 
-from ampiclonnoise import sff, anoiseio
+from ampliconnoise import sff, anoiseio
 
 class _FlowerWriter(object):
     def __init__(self, fp, *args):
@@ -164,7 +164,7 @@ class SFFRunSplitter(object):
 
     def split(self, iterable):
         """
-        Takes an iterable generating :ref:`ampiclonnoise.sff.SFFRead`s,
+        Takes an iterable generating :ref:`ampliconnoise.sff.SFFRead`s,
         writes them to a set of output files
         returns a dictionary of mapping barcode -> # of reads
         """

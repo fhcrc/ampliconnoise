@@ -3,8 +3,8 @@ import shutil
 import tempfile
 import unittest
 
-from ampiclonnoise import anoiseio
-from ampiclonnoise.scripts import split
+from ampliconnoise import anoiseio
+from ampliconnoise.scripts import split
 
 def _line_iterator(s):
     return iter(s.splitlines())
