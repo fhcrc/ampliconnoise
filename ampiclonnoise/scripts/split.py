@@ -80,6 +80,9 @@ def _close_all(files):
 
 
 class SFFRunSplitter(object):
+    """
+    Splits flows based on the initial sequence contained in the flowgram
+    """
 
     def __init__(self, barcode_map, primer, dest_dir, unmatched_dest,
                  formatter=str):
@@ -100,6 +103,7 @@ class SFFRunSplitter(object):
         self.unmatched_dest = unmatched_dest
         self.formatter = formatter
 
+        # Compile barcode matching Regex
         min_barcode_length = min(len(k) for k in self.barcode_map)
         max_barcode_length = max(len(k) for k in self.barcode_map)
         self._barcode_re = re.compile(r'TCAG(\w{{{0},{1}}}){2}'.format(
@@ -107,8 +111,6 @@ class SFFRunSplitter(object):
                                       re.IGNORECASE)
         _makedirs(dest_dir)
         self._handles = None
-        self._unmatched_counts = collections.defaultdict(int)
-
 
     def open(self):
         """
@@ -130,7 +132,7 @@ class SFFRunSplitter(object):
 
     def close(self):
         """
-        Closes all open file handles
+        Closes all open file handles on this instance
         """
         if self._handles is not None:
             _close_all(self._handles.values())
@@ -146,9 +148,6 @@ class SFFRunSplitter(object):
 
         fp = self._handles.get(barcode, self._handles[None])
 
-        if barcode and barcode not in self._handles:
-            self._unmatched_counts[barcode] += 1
-
         print >> fp, self.formatter(record)
         return barcode
 
@@ -159,9 +158,16 @@ class SFFRunSplitter(object):
         returns a dictionary of mapping barcode -> # of reads
         """
         counts = collections.defaultdict(int)
+        unmatched_counts = collections.defaultdict(int)
+
         for record in iterable:
             barcode = self._handle_record(record)
             counts[barcode] += 1
+
+        if barcode in self._handles:
+            count[barcode] += 1
+        else:
+            unmatched_count[barcode] += 1
 
         return counts
 
@@ -208,6 +214,8 @@ def main(args=sys.argv[1:]):
 
     splitter = SFFRunSplitter(barcodes, parsed.primer, parsed.output_directory,
                               parsed.unmatched_name, formatter)
+
+    # Run
     with contextlib.closing(splitter):
         splitter.open()
         with parsed.sff_file:
@@ -221,4 +229,5 @@ def main(args=sys.argv[1:]):
     items = sorted(result.items())
     for k, v in items:
         print 'Barcode {0}: {1:5d} records'.format(k, v)
+
     print 'Unmatched:', unmatched, 'records'

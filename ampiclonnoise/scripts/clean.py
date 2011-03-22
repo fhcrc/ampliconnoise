@@ -1,5 +1,15 @@
 """
-Implementation of cleaning script
+Clean sff.txt or anoise raw data file:
+
+    * Truncate each sequence to the first occurrence of bad data, defined by:
+        * 4 flows in a row with no reads
+        * Reading above some high signal cutoff
+        * Positive, but excessively low readings
+    * Trim long sequences to a defined maximum length
+    * Only accept sequences with a defined minimum length
+
+Creating an output .fasta and a .dat file, suitable for feeding into the
+AmpiclonNoise C code.
 """
 
 import argparse
@@ -13,6 +23,7 @@ from ampiclonnoise import sff, anoiseio
 DEFAULT_MIN_FLOWS = None
 DEFAULT_MAX_FLOWS = 360
 
+# Possible TODO: Make the thresholds configurable
 def is_flowgram_valid(flowgram, high_signal_cutoff=9.49,
                       low_signal_cutoff=0.7, signal_start=0.5):
     """
@@ -46,7 +57,7 @@ def is_flowgram_valid(flowgram, high_signal_cutoff=9.49,
 
 def trim_noise(flows):
     """
-    Trims flows to the first noisy flowgram found
+    Trims a list of flows to the first noisy flowgram found
     """
     flowgram_size = 4
 
@@ -75,7 +86,7 @@ def handle_record(flows, primer_re, min_flows, max_flows):
     If the record has good data and meets the min_flows requirement:
     Returns a length-2 tuple containing the sequence to be
     written to the FASTA file, and a set of flows trimmed to
-    MAX_ANOISE_LENGTH.
+    max_flows length.
 
     Otherwise, returns ``(None, None)``
     """
@@ -106,10 +117,13 @@ def invoke(reader, fa_handle, dat_path, primer, min_flows, max_flows):
     good = 0
     bad = 0
     primer_re = re.compile(r'^TCAG.*({0}.*)'.format(primer))
+
+    # On the first pass, write to a temporary file: we'll need to include the
+    # record count and maximum length at the beginning of the file later.
     with tempfile.TemporaryFile() as dat_handle:
         for record in reader:
-            sequence, flows = handle_record(record.flows, primer_re, min_flows,
-                                            max_flows)
+            sequence, flows = handle_record(record.flows, primer_re,
+                                            min_flows, max_flows)
             if sequence and flows:
                 # Write FASTA
                 print >> fa_handle, '>{0}\n{1}'.format(record.identifier,
@@ -121,8 +135,7 @@ def invoke(reader, fa_handle, dat_path, primer, min_flows, max_flows):
             else:
                 bad += 1
 
-
-        print '{0} good records, {1} bad records'.format(good, bad)
+        print '{0} good records; {1} bad records'.format(good, bad)
 
         # Second pass - add a line with number clean and maximum length
         dat_handle.seek(0)
@@ -151,17 +164,18 @@ trim.""")
             help="base name for output files - OUTNAME.fa and OUTNAME.dat")
     parser.add_argument('--input', metavar='INPUT', default=sys.stdin,
             type=argparse.FileType('r'),
-            help='Input sff-processed data file (default: stdin)')
-    parser.add_argument('--anoise-input', action='store_true',
-            help='Input is in ampiclonnoise raw file format',
+            help='Input data file (default: stdin)')
+    parser.add_argument('--flower-input', action='store_true',
+            help='Input is in flower-decoded .sff.txt format '
+                 '(default: %(default)s)',
             default=False)
     parsed = parser.parse_args(args)
 
     try:
-        if parsed.anoise_input:
-            reader = anoiseio.SplitKeysReader(parsed.input)
-        else:
+        if parsed.flower_input:
             reader = sff.parse_flower(parsed.input)
+        else:
+            reader = anoiseio.SplitKeysReader(parsed.input)
         with open(parsed.outname + '.fa', 'w') as fasta_handle:
             invoke(reader, fasta_handle, parsed.outname + '.dat',
                    parsed.primer, parsed.min_flows, parsed.max_flows)
