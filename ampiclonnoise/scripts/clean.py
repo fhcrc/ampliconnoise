@@ -175,7 +175,7 @@ trim.""")
         if parsed.flower_input:
             reader = sff.parse_flower(parsed.input)
         else:
-            reader = anoiseio.SplitKeysReader(parsed.input)
+            reader = anoiseio.AnoiseRawReader(parsed.input)
         with open(parsed.outname + '.fa', 'w') as fasta_handle:
             invoke(reader, fasta_handle, parsed.outname + '.dat',
                    parsed.primer, parsed.min_flows, parsed.max_flows)

@@ -22,11 +22,20 @@ import os.path
 import re
 import sys
 
-from ampiclonnoise import sff
+from ampiclonnoise import sff, anoiseio
 
+class _FlowerWriter(object):
+    def __init__(self, fp, *args):
+        self._fp = fp
+
+    def write(self, record):
+        print >>self._fp, str(record)
+
+    def close(self):
+        self._fp.close()
 
 # Output formatters - each takes a record, returns a string to write
-FORMATTERS = {'flower': str, 'anoise_raw': sff.SFFRead.to_anoise_raw}
+WRITERS = {'flower': _FlowerWriter, 'anoise_raw': anoiseio.AnoiseRawWriter }
 
 
 def _makedirs(d):
@@ -85,7 +94,7 @@ class SFFRunSplitter(object):
     """
 
     def __init__(self, barcode_map, primer, dest_dir, unmatched_dest,
-                 formatter=str):
+                 writer_cls):
         """
         Initialize a new instance
 
@@ -94,14 +103,14 @@ class SFFRunSplitter(object):
         :param str dest_dir: destination directory for output
         :param str unmatched_dest: name of file for all input
           sequences not matching any barcodes.
-        :param func formatter: Function to use to format records. Passed a
+        :param func writer: Function to use to format records. Passed a
           single argument as input - the record
         """
         self.barcode_map = barcode_map
         self.primer = primer
         self.dest_dir = dest_dir
         self.unmatched_dest = unmatched_dest
-        self.formatter = formatter
+        self.writer_cls = writer_cls
 
         # Compile barcode matching Regex
         min_barcode_length = min(len(k) for k in self.barcode_map)
@@ -124,11 +133,13 @@ class SFFRunSplitter(object):
         for barcode, name in self.barcode_map.items():
             fname = name + '.raw'
             outpath = os.path.join(self.dest_dir, fname)
-            self._handles[barcode] = open(outpath, 'w')
+            fp = open(outpath, 'w')
+            self._handles[barcode] = self.writer_cls(fp, barcode)
 
         # Create a default handle
         default_outpath = os.path.join(self.dest_dir, self.unmatched_dest)
-        self._handles[None] = open(default_outpath + '.raw', 'w')
+        fp = open(default_outpath + '.raw', 'w')
+        self._handles[None] = self.writer_cls(fp, 'Unknown')
 
     def close(self):
         """
@@ -146,9 +157,9 @@ class SFFRunSplitter(object):
         m = self._barcode_re.match(bases)
         barcode = m.group(1) if m else None
 
-        fp = self._handles.get(barcode, self._handles[None])
+        writer = self._handles.get(barcode, self._handles[None])
+        writer.write(record)
 
-        print >> fp, self.formatter(record)
         return barcode
 
     def split(self, iterable):
@@ -198,7 +209,7 @@ def main(args=sys.argv[1:]):
     parser.add_argument('--output-directory', metavar='DIR',
             default='split', help='Output directory for split files')
     parser.add_argument('--output-format', metavar='FORMAT',
-            default='anoise_raw', choices=FORMATTERS.keys(),
+            default='anoise_raw', choices=WRITERS.keys(),
             help="Output format (choices: [%(choices)s], default: %(default)s)")
     parser.add_argument('--unmatched-name', default='unmatched',
             help='Name for file containing unmatched records. '
@@ -206,14 +217,14 @@ def main(args=sys.argv[1:]):
 
     parsed = parser.parse_args(args)
 
-    formatter = FORMATTERS[parsed.output_format]
+    writer = WRITERS[parsed.output_format]
 
     # Split barcodes
     with parsed.barcode_file:
         barcodes = _load_barcodes(parsed.barcode_file)
 
     splitter = SFFRunSplitter(barcodes, parsed.primer, parsed.output_directory,
-                              parsed.unmatched_name, formatter)
+                              parsed.unmatched_name, writer)
 
     # Run
     with contextlib.closing(splitter):

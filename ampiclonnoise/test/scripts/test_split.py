@@ -3,6 +3,7 @@ import shutil
 import tempfile
 import unittest
 
+from ampiclonnoise import anoiseio
 from ampiclonnoise.scripts import split
 
 def _line_iterator(s):
@@ -55,7 +56,8 @@ class SFFRunSplitterTestCase(unittest.TestCase):
         self.unmatched_dest = 'unmatched'
         self.instance = split.SFFRunSplitter(self.barcodes, self.primer,
                                              self.output_dir,
-                                             self.unmatched_dest)
+                                             self.unmatched_dest,
+                                             anoiseio.AnoiseRawWriter)
 
     def tearDown(self):
         self.instance.close()
@@ -79,7 +81,7 @@ class SFFRunSplitterTestCase(unittest.TestCase):
         instance = self.instance
         def check_name(key, fname):
             self.assertTrue(key in instance._handles, msg='Missing key: {0}'.format(key))
-            path = instance._handles[key].name
+            path = instance._handles[key]._fp.name
             self.assertEquals(fname, os.path.basename(path))
         instance.open()
         self.assertEquals(3, len(instance._handles))
@@ -92,14 +94,14 @@ class SFFRunSplitterTestCase(unittest.TestCase):
         instance = self.instance
         instance.open()
         for f in instance._handles.values():
-            self.assertTrue(not f.closed, msg='Closed: {0}'.format(f))
+            self.assertTrue(not f._fp.closed, msg='Closed: {0}'.format(f))
 
     def test_open_files_close(self):
         instance = self.instance
         instance.open()
         instance.close()
         for f in instance._handles.values():
-            self.assertTrue(f.closed, msg='Still open: {0}'.format(f))
+            self.assertTrue(f._fp.closed, msg='Still open: {0}'.format(f))
 
     def _test_write_dest(self, barcode, identifier):
         handle = self.instance._handles[barcode]

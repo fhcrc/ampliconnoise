@@ -118,6 +118,3 @@ class TestSFFRecord(unittest.TestCase):
         for expected_line, actual_line in zip(expected_lines, actual_lines):
             self.assertEquals(expected_line, actual_line)
 
-    def test_to_anoise_raw(self):
-        expected = ">FTWCYXX01BTPDQ\n14 1.04 0.01 1.02 0.07 0.05 0.97 0.06 2.00 0.96 1.09 0.98 0.08 0.02 1.18"
-        self.assertEqual(expected, self.record.to_anoise_raw())

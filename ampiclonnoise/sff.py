@@ -62,11 +62,11 @@ class SFFRead(object):
         return '\n'.join(lines)
 
     @property
-    def right_trim(self):
+    def right_clip(self):
         return self.clip[1]
 
     @property
-    def left_trim(self):
+    def left_clip(self):
         return self.clip[0]
 
     def bases_from_flows(self):
@@ -74,18 +74,8 @@ class SFFRead(object):
         Return the bases associated with the flow records, trimmed
         to the right clip value
         """
-        rtrim = self.right_trim
+        rtrim = self.right_clip
         return flow_to_seq(self.flows[:rtrim])
-
-    def to_anoise_raw(self):
-        """
-        Generates a string suitable for using as input to Ampiclonnoise,
-        consisting of the identifier, a newline, the integer length of the
-        flow, a space, and the float flow readings.
-        """
-        return '>{identifier}\n{length} {flow}'.format(
-                identifier=self.identifier, length=len(self.flows),
-                flow=self._flow_to_string())
 
     def validate(self):
         """

@@ -20,10 +20,10 @@ Scripts
 
 Running setup.py installs:
 
-``anoise_split``
+``anoise-split``
   Split sequencing results based on sample barcodes
 
-``anoise_clean``
+``anoise-clean``
   Clean bad reads, trim long reads, and require a minimum length
 
 
