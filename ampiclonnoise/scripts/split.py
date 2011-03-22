@@ -1,7 +1,7 @@
 """
 Given the input:
 
-  * A text-converted Standard Flowgram File
+  * A flower-converted Standard Flowgram File
   * A file containing mappings from DNA sequence barcodes to a meaningful
     identifier
   * A regular expression to identify the primer sequence used
@@ -199,7 +199,7 @@ def main(args=sys.argv[1:]):
             default='split', help='Output directory for split files')
     parser.add_argument('--output-format', metavar='FORMAT',
             default='anoise_raw', choices=FORMATTERS.keys(),
-            help="Output format")
+            help="Output format (choices: [%(choices)s], default: %(default)s)")
     parser.add_argument('--unmatched-name', default='unmatched',
             help='Name for file containing unmatched records. '
                  'Default: %(default)s)')
