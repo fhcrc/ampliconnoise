@@ -115,8 +115,8 @@ class SFFRunSplitter(object):
         # Compile barcode matching Regex
         min_barcode_length = min(len(k) for k in self.barcode_map)
         max_barcode_length = max(len(k) for k in self.barcode_map)
-        self._barcode_re = re.compile(r'TCAG(\w{{{0},{1}}}){2}'.format(
-            min_barcode_length, max_barcode_length, primer),
+        self._barcode_re = re.compile(r'^{0}(\w{{{1},{2}}}){3}'.format(
+            sff.READ_BEGIN, min_barcode_length, max_barcode_length, primer),
                                       re.IGNORECASE)
         _makedirs(dest_dir)
         self._handles = None

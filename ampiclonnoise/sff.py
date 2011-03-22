@@ -10,6 +10,9 @@ import re
 # Sequence in which nucleotides are flowed:
 FLOW_ORDER = 'TACG'
 
+# Sequence at the beginning of reads
+READ_BEGIN = 'TCAG'
+
 
 def flow_to_seq(flowgram, flow_order=FLOW_ORDER):
     """

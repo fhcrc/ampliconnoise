@@ -116,7 +116,7 @@ def invoke(reader, fa_handle, dat_path, primer, min_flows, max_flows):
     """
     good = 0
     bad = 0
-    primer_re = re.compile(r'^TCAG.*({0}.*)'.format(primer))
+    primer_re = re.compile(r'^{0}.*({1}.*)'.format(sff.READ_BEGIN, primer))
 
     # On the first pass, write to a temporary file: we'll need to include the
     # record count and maximum length at the beginning of the file later.
