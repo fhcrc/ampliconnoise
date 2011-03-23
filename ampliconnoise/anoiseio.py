@@ -6,6 +6,7 @@ import tempfile
 
 from ampliconnoise import sff
 
+
 class AnoiseRawReader(object):
     """
     Reader for AmpliconNoise .raw files,
@@ -37,6 +38,7 @@ class AnoiseRawReader(object):
             record.flows = flows
             yield record
 
+
 def _record_to_anoise_raw(record):
     """
     Generates a string suitable for using as input to AmpliconNoise,
@@ -46,6 +48,7 @@ def _record_to_anoise_raw(record):
     return '>{identifier}\n{length} {flow}'.format(
             identifier=record.identifier, length=record.right_clip,
             flow=record._flow_to_string())
+
 
 class AnoiseRawWriter(object):
     """
@@ -68,7 +71,7 @@ class AnoiseRawWriter(object):
         return '{0.count} {0.identifier} {0.file_name}'.format(self)
 
     def write(self, record):
-        print >>self._temp, _record_to_anoise_raw(record)
+        print >> self._temp, _record_to_anoise_raw(record)
         self.count += 1
 
     def _copy_to_output(self):
@@ -78,7 +81,7 @@ class AnoiseRawWriter(object):
         # Rewind
         self._temp.seek(0)
         # Write header
-        print >>self._fp, self._header()
+        print >> self._fp, self._header()
         # Copy contents
         shutil.copyfileobj(self._temp, self._fp)
 

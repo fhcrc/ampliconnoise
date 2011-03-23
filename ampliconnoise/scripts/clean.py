@@ -23,6 +23,7 @@ from ampliconnoise import sff, anoiseio
 DEFAULT_MIN_FLOWS = None
 DEFAULT_MAX_FLOWS = 360
 
+
 # Possible TODO: Make the thresholds configurable
 def is_flowgram_valid(flowgram, high_signal_cutoff=9.49,
                       low_signal_cutoff=0.7, signal_start=0.5):
@@ -90,9 +91,6 @@ def handle_record(flows, primer_re, min_flows, max_flows):
 
     Otherwise, returns ``(None, None)``
     """
-    flow_length = len(flows)
-    flowgram_size = 4
-
     trimmed_flows = trim_noise(flows)
     trimmed_reading = sff.flow_to_seq(trimmed_flows)
 

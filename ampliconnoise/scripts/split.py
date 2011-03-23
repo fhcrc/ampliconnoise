@@ -24,18 +24,19 @@ import sys
 
 from ampliconnoise import sff, anoiseio
 
+
 class _FlowerWriter(object):
     def __init__(self, fp, *args):
         self._fp = fp
 
     def write(self, record):
-        print >>self._fp, str(record)
+        print >> self._fp, str(record)
 
     def close(self):
         self._fp.close()
 
 # Output formatters - each takes a record, returns a string to write
-WRITERS = {'flower': _FlowerWriter, 'anoise_raw': anoiseio.AnoiseRawWriter }
+WRITERS = {'flower': _FlowerWriter, 'anoise_raw': anoiseio.AnoiseRawWriter}
 
 
 def _makedirs(d):
@@ -210,7 +211,7 @@ def main(args=sys.argv[1:]):
             default='.', help='Output directory for split files')
     parser.add_argument('--output-format', metavar='FORMAT',
             default='anoise_raw', choices=WRITERS.keys(),
-            help="Output format (choices: [%(choices)s], default: %(default)s)")
+            help="Output format (choices: [%(choices)s], default:%(default)s)")
     parser.add_argument('--unmatched-name', default='unmatched',
             help='Name for file containing unmatched records. '
                  'Default: %(default)s)')

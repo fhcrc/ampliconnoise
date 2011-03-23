@@ -3,7 +3,6 @@ Tools for working with raw flower output.
 """
 
 import itertools
-import math
 import re
 
 
@@ -18,15 +17,17 @@ def flow_to_seq(flowgram, flow_order=FLOW_ORDER):
     """
     Takes a list of float flow results and transforms them to a sequence
 
-    Taken from Chris Quince's AmpliconNoise perl script
+    Taken from Chris Quince's AmpliconNoise perl scripts
     """
-
+    # Bases are repeatedly flowed in flow_order
     bases = itertools.cycle(flow_order)
 
     result = []
+
+    # Build the sequence
     for read_value, base in zip(flowgram, bases):
-        # Round to the nearest value
-        signal = int(math.floor(read_value + 0.5))
+        # Get base counts: round to the nearest integer value
+        signal = int(round(read_value, 0))
         result.extend([base] * signal)
 
     return ''.join(result)
@@ -34,7 +35,7 @@ def flow_to_seq(flowgram, flow_order=FLOW_ORDER):
 
 class SFFRead(object):
     """
-    SFF Reading
+    Single reading from a 454 run.
     """
 
     __slots__ = ['identifier', 'info', 'clip',
@@ -82,7 +83,8 @@ class SFFRead(object):
 
     def validate(self):
         """
-        Makes sure all attributes are set
+        Makes sure all attributes are set, raising a ValueError if any are
+        missing.
         """
         failures = []
         for i in SFFRead.__slots__:
@@ -105,6 +107,9 @@ class SFFRead(object):
         Converts the flow floats to a string
         """
         return ' '.join(self.string_flows)
+
+
+# Flower .sff.txt parsers
 
 # Matches read headers in flower output
 _HEADER_REGEXP = re.compile(r'^\s*>(.*)')
@@ -150,6 +155,7 @@ def parse_flower(iterable):
         try:
             line = next(iterable)
         except StopIteration:
+            # EOF
             record.validate()
             yield record
             break
@@ -165,6 +171,7 @@ def parse_flower(iterable):
         key, value = m.groups()
 
         try:
+            # Check if attribute is already set.
             if getattr(record, key.lower(), None) is not None:
                 raise ValueError("{0} already set: {1}".format(key,
                         getattr(record, key.lower())))

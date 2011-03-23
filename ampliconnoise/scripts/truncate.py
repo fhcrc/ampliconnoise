@@ -4,6 +4,15 @@ import sys
 
 
 def trim(barcode, length, in_handle, out_handle):
+    """
+    Trim input sequences, write to out_handle
+
+    Trims barcodes from FASTA-formatted sequences in in_handle, truncates
+    sequences at provided length, writes to out_handle.
+
+    Note:
+    Sequences passed must be on a single line.
+    """
     # trim leading G's #TODO: why
     # barcode = barcode.lstrip('G')
     lines = (line.rstrip() for line in in_handle)
@@ -12,7 +21,7 @@ def trim(barcode, length, in_handle, out_handle):
     for line in lines:
         if line.startswith('>'):
             # Fasta header
-            print >>out_handle, line
+            print >> out_handle, line
         else:
             m = pattern.match(line)
 
@@ -22,7 +31,11 @@ def trim(barcode, length, in_handle, out_handle):
             seq = m.group(1)
             print >> out_handle, seq[:length]
 
+
 def main(args=sys.argv[1:]):
+    """
+    Parse arguments, run trim script.
+    """
 
     parser = argparse.ArgumentParser(description="""Removes sequence <tag>,
 trims remaining sequence to <length> from FASTA-formatted sequences passed
