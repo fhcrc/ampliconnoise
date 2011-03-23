@@ -207,7 +207,7 @@ def main(args=sys.argv[1:]):
             type=argparse.FileType('r'),
             help='Flower-decoded SFF text file. Default: stdin')
     parser.add_argument('--output-directory', metavar='DIR',
-            default='split', help='Output directory for split files')
+            default='.', help='Output directory for split files')
     parser.add_argument('--output-format', metavar='FORMAT',
             default='anoise_raw', choices=WRITERS.keys(),
             help="Output format (choices: [%(choices)s], default: %(default)s)")
