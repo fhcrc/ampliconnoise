@@ -3,6 +3,19 @@ import re
 import sys
 
 
+def build_parser(parser):
+    """
+    Adds command options to parser
+    """
+    parser.description="""Removes sequence <tag>,
+trims remaining sequence to <length> from FASTA-formatted sequences passed
+to stdin, printing to stdout."""
+    parser.add_argument('barcode', metavar='<tag>',
+            help='Sequence tag')
+    parser.add_argument('length', metavar='<length>',
+            help='Trim sequences to <length>', type=int)
+    return parser
+
 def trim(barcode, length, in_handle, out_handle):
     # trim leading G's #TODO: why
     # barcode = barcode.lstrip('G')
@@ -22,16 +35,5 @@ def trim(barcode, length, in_handle, out_handle):
             seq = m.group(1)
             print >> out_handle, seq[:length]
 
-def main(args=sys.argv[1:]):
-
-    parser = argparse.ArgumentParser(description="""Removes sequence <tag>,
-trims remaining sequence to <length> from FASTA-formatted sequences passed
-to stdin, printing to stdout.""")
-    parser.add_argument('barcode', metavar='<tag>',
-            help='Sequence tag')
-    parser.add_argument('length', metavar='<length>',
-            help='Trim sequences to <length>', type=int)
-
-    parsed = parser.parse_args(args)
-
+def main(parsed):
     trim(parsed.barcode, parsed.length, sys.stdin, sys.stdout)

@@ -23,6 +23,33 @@ from ampliconnoise import sff, anoiseio
 DEFAULT_MIN_FLOWS = None
 DEFAULT_MAX_FLOWS = 360
 
+def build_parser(parser):
+    """
+    Given an ArgumentParser, adds options taken by ``clean``
+    """
+    parser.description = """Clean flowgrams prior to
+processing with AmpliconNoise: enforce minimum length, remove invalid data,
+trim."""
+    parser.add_argument('--min-flows', type=int,
+            help="Minimum length to accept sequence"
+            " default: %(default)s", default=DEFAULT_MIN_FLOWS)
+    parser.add_argument('--max-flows', type=int,
+            help="Maximum length to trim sequences to "
+            "default: %(default)s", default=DEFAULT_MAX_FLOWS)
+    parser.add_argument('primer', metavar='PRIMER',
+            help="Regexp to identify primer sequence")
+    parser.add_argument('outname', metavar="OUTNAME",
+            help="base name for output files - OUTNAME.fa and OUTNAME.dat")
+    parser.add_argument('--input', metavar='INPUT', default=sys.stdin,
+            type=argparse.FileType('r'),
+            help='Input data file (default: stdin)')
+    parser.add_argument('--flower-input', action='store_true',
+            help='Input is in flower-decoded .sff.txt format '
+                 '(default: %(default)s)',
+            default=False)
+    return parser
+
+
 # Possible TODO: Make the thresholds configurable
 def is_flowgram_valid(flowgram, high_signal_cutoff=9.49,
                       low_signal_cutoff=0.7, signal_start=0.5):
@@ -145,32 +172,10 @@ def invoke(reader, fa_handle, dat_path, primer, min_flows, max_flows):
             shutil.copyfileobj(dat_handle, dat_fp)
 
 
-def main(args=sys.argv[1:]):
+def main(parsed):
     """
     Check arguments, call invoke(...)
     """
-    parser = argparse.ArgumentParser(description="""Clean flowgrams prior to
-processing with AmpliconNoise: enforce minimum length, remove invalid data,
-trim.""")
-    parser.add_argument('--min-flows', type=int,
-            help="Minimum length to accept sequence"
-            " default: %(default)s", default=DEFAULT_MIN_FLOWS)
-    parser.add_argument('--max-flows', type=int,
-            help="Maximum length to trim sequences to "
-            "default: %(default)s", default=DEFAULT_MAX_FLOWS)
-    parser.add_argument('primer', metavar='PRIMER',
-            help="Regexp to identify primer sequence")
-    parser.add_argument('outname', metavar="OUTNAME",
-            help="base name for output files - OUTNAME.fa and OUTNAME.dat")
-    parser.add_argument('--input', metavar='INPUT', default=sys.stdin,
-            type=argparse.FileType('r'),
-            help='Input data file (default: stdin)')
-    parser.add_argument('--flower-input', action='store_true',
-            help='Input is in flower-decoded .sff.txt format '
-                 '(default: %(default)s)',
-            default=False)
-    parsed = parser.parse_args(args)
-
     try:
         if parsed.flower_input:
             reader = sff.parse_flower(parsed.input)
