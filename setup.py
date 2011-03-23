@@ -9,5 +9,5 @@ setup(name = 'ampliconnoise',
       author_email = 'cmccoy@fhcrc.org',
       packages = ['ampliconnoise', 'ampliconnoise.test'],
       requires = ['Python (>= 2.7)'],
-      scripts = ['scripts/anoise-clean', 'scripts/anoise-split'],
+      scripts = glob.glob('scripts/*'),
       )
