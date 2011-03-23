@@ -23,10 +23,12 @@ from ampliconnoise import sff, anoiseio
 DEFAULT_MIN_FLOWS = None
 DEFAULT_MAX_FLOWS = 360
 
-def build_parser(parser):
+def build_parser(subparsers):
     """
     Given an ArgumentParser, adds options taken by ``clean``
     """
+    parser = subparsers.add_parser("clean",
+            help='Clean flowgrams prior to running AmpliconNoise')
     parser.description = """Clean flowgrams prior to
 processing with AmpliconNoise: enforce minimum length, remove invalid data,
 trim."""

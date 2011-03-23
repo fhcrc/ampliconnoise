@@ -39,10 +39,11 @@ class _FlowerWriter(object):
 WRITERS = {'flower': _FlowerWriter, 'anoise_raw': anoiseio.AnoiseRawWriter }
 
 
-def build_parser(parser):
+def build_parser(subparsers):
     """
     Adds description, command line options to parser
     """
+    parser = subparsers.add_parser('split', help="Split .sff.txt by tag")
     parser.epilog = __doc__
     parser.description = "sff.txt splitter"
     parser.formatter_class = argparse.RawDescriptionHelpFormatter

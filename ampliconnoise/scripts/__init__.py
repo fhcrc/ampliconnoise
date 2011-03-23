@@ -15,12 +15,11 @@ def main(args=sys.argv[1:]):
     """
     parser = argparse.ArgumentParser(description="""Prepare data for use with
 AmpiclonNoise""")
-    subparsers = parser.add_subparsers(title='Commands')
+    subparsers = parser.add_subparsers(title='Commands', help="Valid commands")
 
     for command_name in SUBCOMMANDS:
-        p = subparsers.add_parser(command_name)
         p_module = importlib.import_module('.' + command_name, __package__)
-        p_module.build_parser(p)
+        p = p_module.build_parser(subparsers)
         p.set_defaults(func=p_module.main)
 
     parsed_args = parser.parse_args(args)

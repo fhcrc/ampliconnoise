@@ -3,13 +3,15 @@ import re
 import sys
 
 
-def build_parser(parser):
+def build_parser(subparsers):
     """
     Adds command options to parser
     """
-    parser.description="""Removes sequence <tag>,
+    parser = subparsers.add_parser('truncate',
+             help="Remove tags and truncate length of FASTA files.",
+             description="""Removes sequence <tag>,
 trims remaining sequence to <length> from FASTA-formatted sequences passed
-to stdin, printing to stdout."""
+to stdin, printing to stdout.""")
     parser.add_argument('barcode', metavar='<tag>',
             help='Sequence tag')
     parser.add_argument('length', metavar='<length>',
