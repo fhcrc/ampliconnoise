@@ -18,13 +18,16 @@ Installation
 Scripts
 -------
 
-Running setup.py installs:
+Running setup.py installs the ``ampiclonnoise`` package, most accessible from 
+the ``anoise`` script.
 
-``anoise-split``
-  Split sequencing results based on sample barcodes
+``anoise`` needs a subcommand to be useful:
 
-``anoise-clean``
-  Clean bad reads, trim long reads, and require a minimum length
+* ``clean``: Trim bad flowgrams, enforce a minimum number of flows, remove any
+  flows beyond a defined maximum
+* ``split``: Split sequences from a flower-decoded SFF file by tag sequence, 
+  writing the results to a file for each tag
+* ``truncate``: Trim tags from FASTA sequences, truncate length
 
 
 .. _AmpiclonNoise: http://code.google.com/p/ampliconnoise/

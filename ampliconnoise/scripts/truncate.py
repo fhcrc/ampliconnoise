@@ -3,6 +3,21 @@ import re
 import sys
 
 
+def build_parser(subparsers):
+    """
+    Adds command options to parser
+    """
+    parser = subparsers.add_parser('truncate',
+             help="Remove tags and truncate length of FASTA files.",
+             description="""Removes sequence <tag>,
+trims remaining sequence to <length> from FASTA-formatted sequences passed
+to stdin, printing to stdout.""")
+    parser.add_argument('barcode', metavar='<tag>',
+            help='Sequence tag')
+    parser.add_argument('length', metavar='<length>',
+            help='Trim sequences to <length>', type=int)
+    return parser
+
 def trim(barcode, length, in_handle, out_handle):
     """
     Trim input sequences, write to out_handle
@@ -31,20 +46,8 @@ def trim(barcode, length, in_handle, out_handle):
             seq = m.group(1)
             print >> out_handle, seq[:length]
 
-
-def main(args=sys.argv[1:]):
+def main(parsed):
     """
-    Parse arguments, run trim script.
+    Calls ``trim(...)`` based on parsed arguments
     """
-
-    parser = argparse.ArgumentParser(description="""Removes sequence <tag>,
-trims remaining sequence to <length> from FASTA-formatted sequences passed
-to stdin, printing to stdout.""")
-    parser.add_argument('barcode', metavar='<tag>',
-            help='Sequence tag')
-    parser.add_argument('length', metavar='<length>',
-            help='Trim sequences to <length>', type=int)
-
-    parsed = parser.parse_args(args)
-
     trim(parsed.barcode, parsed.length, sys.stdin, sys.stdout)

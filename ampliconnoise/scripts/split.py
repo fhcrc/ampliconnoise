@@ -39,6 +39,37 @@ class _FlowerWriter(object):
 WRITERS = {'flower': _FlowerWriter, 'anoise_raw': anoiseio.AnoiseRawWriter}
 
 
+def build_parser(subparsers):
+    """
+    Adds description, command line options to parser
+    """
+    parser = subparsers.add_parser('split', help="Split .sff.txt by tag")
+    parser.epilog = __doc__
+    parser.description = "sff.txt splitter"
+    parser.formatter_class = argparse.RawDescriptionHelpFormatter
+
+    # Required arguments
+    parser.add_argument('barcode_file', metavar='BARCODE_FILE',
+            type=argparse.FileType('r'),
+            help='Path to barcode file with barcode_id,barcode_seq pairs')
+    parser.add_argument('primer', metavar='PRIMER',
+            help='Regular expression identifying the primer used')
+
+    # Optional arguments
+    parser.add_argument('--sff-file', metavar='SFF_TXT', default=sys.stdin,
+            type=argparse.FileType('r'),
+            help='Flower-decoded SFF text file. Default: stdin')
+    parser.add_argument('--output-directory', metavar='DIR', default='.',
+            help='Output directory for split files (default: %(default)s)')
+    parser.add_argument('--output-format', metavar='FORMAT',
+            default='anoise_raw', choices=WRITERS.keys(),
+            help="Output format (choices: [%(choices)s], default: %(default)s)")
+    parser.add_argument('--unmatched-name', default='unmatched',
+            help='Name for file containing unmatched records. '
+                 'Default: %(default)s)')
+
+    return parser
+
 def _makedirs(d):
     """
     Make all directories to leaf dir ``d``
@@ -184,7 +215,7 @@ class SFFRunSplitter(object):
         return counts
 
 
-def main(args=sys.argv[1:]):
+def main(parsed_args):
     """
     Command-line functionality
 
@@ -192,46 +223,20 @@ def main(args=sys.argv[1:]):
     * read barcodes
     * run
     """
-    parser = argparse.ArgumentParser(epilog=__doc__,
-            description="sff.txt splitter",
-            formatter_class=argparse.RawDescriptionHelpFormatter)
-
-    # Required arguments
-    parser.add_argument('barcode_file', metavar='BARCODE_FILE',
-            type=argparse.FileType('r'),
-            help='Path to barcode file with barcode_id,barcode_seq pairs')
-    parser.add_argument('primer', metavar='PRIMER',
-            help='Regular expression identifying the primer used')
-
-    # Optional arguments
-    parser.add_argument('--sff-file', metavar='SFF_TXT', default=sys.stdin,
-            type=argparse.FileType('r'),
-            help='Flower-decoded SFF text file. Default: stdin')
-    parser.add_argument('--output-directory', metavar='DIR',
-            default='.', help='Output directory for split files')
-    parser.add_argument('--output-format', metavar='FORMAT',
-            default='anoise_raw', choices=WRITERS.keys(),
-            help="Output format (choices: [%(choices)s], default:%(default)s)")
-    parser.add_argument('--unmatched-name', default='unmatched',
-            help='Name for file containing unmatched records. '
-                 'Default: %(default)s)')
-
-    parsed = parser.parse_args(args)
-
-    writer = WRITERS[parsed.output_format]
+    writer = WRITERS[parsed_args.output_format]
 
     # Split barcodes
-    with parsed.barcode_file:
-        barcodes = _load_barcodes(parsed.barcode_file)
+    with parsed_args.barcode_file:
+        barcodes = _load_barcodes(parsed_args.barcode_file)
 
-    splitter = SFFRunSplitter(barcodes, parsed.primer, parsed.output_directory,
-                              parsed.unmatched_name, writer)
+    splitter = SFFRunSplitter(barcodes, parsed_args.primer, parsed_args.output_directory,
+                              parsed_args.unmatched_name, writer)
 
     # Run
     with contextlib.closing(splitter):
         splitter.open()
-        with parsed.sff_file:
-            reader = sff.parse_flower(parsed.sff_file)
+        with parsed_args.sff_file:
+            reader = sff.parse_flower(parsed_args.sff_file)
             result = splitter.split(reader)
 
     # Special treatment for unmatched records
