@@ -2,9 +2,6 @@ import argparse
 import importlib
 import sys
 
-import clean
-import split
-import truncate
 
 SUBCOMMANDS = ('clean', 'split', 'truncate')
 
@@ -24,4 +21,3 @@ AmpiclonNoise""")
 
     parsed_args = parser.parse_args(args)
     parsed_args.func(parsed_args)
-
