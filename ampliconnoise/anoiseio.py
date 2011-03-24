@@ -36,6 +36,7 @@ class AnoiseRawReader(object):
             flows = map(float, flows)
             record = sff.SFFRead(header)
             record.flows = flows
+            record.clip = [1, flow_length]
             yield record
 
 

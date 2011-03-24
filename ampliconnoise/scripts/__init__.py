@@ -3,7 +3,7 @@ import importlib
 import sys
 
 
-SUBCOMMANDS = ('clean', 'split', 'truncate')
+SUBCOMMANDS = ('clean', 'raw2fasta', 'split', 'truncate')
 
 
 def main(args=sys.argv[1:]):
