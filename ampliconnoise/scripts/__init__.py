@@ -1,5 +1,4 @@
 import argparse
-import importlib
 import sys
 
 
@@ -14,8 +13,10 @@ def main(args=sys.argv[1:]):
 AmpiclonNoise""")
     subparsers = parser.add_subparsers(title='Commands', help="Valid commands")
 
+    modules = __import__(__package__, fromlist=SUBCOMMANDS)
+
     for command_name in SUBCOMMANDS:
-        p_module = importlib.import_module('.' + command_name, __package__)
+        p_module = getattr(modules, command_name)
         p = p_module.build_parser(subparsers)
         p.set_defaults(func=p_module.main)
 
