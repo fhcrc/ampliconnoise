@@ -2,7 +2,7 @@ import argparse
 import sys
 
 
-SUBCOMMANDS = ('clean', 'raw2fasta', 'split', 'truncate')
+SUBCOMMANDS = ('clean', 'raw2fasta', 'split', 'truncate', 'wfasta')
 
 
 def main(args=sys.argv[1:]):
