@@ -24,10 +24,15 @@ def parse_fasta(fp):
             raise ValueError("Unexpected line: {0}".format(line))
 
     while True:
-        header = line
+        header = line[1:]
         seq_lines = []
         while True:
-            line = next(lines)
+            try:
+                line = next(lines)
+            except StopIteration:
+                # End on EOF
+                yield Sequence(header, ''.join(seq_lines))
+                raise StopIteration()
             if line.startswith('>'):
                 break
             else:
@@ -50,7 +55,7 @@ def write_fasta(sequences, fp, wrap=None):
                 wrap = 80
             seq = '\n'.join(textwrap.wrap(sequence, wrap))
         print >> fp, header
-        fp.write(seq)
+        print >> fp, seq
         count += 1
 
     return count
