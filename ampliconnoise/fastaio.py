@@ -53,7 +53,7 @@ def write_fasta(sequences, fp, wrap=None):
         if wrap is not None:
             if wrap is True:
                 wrap = 80
-            seq = '\n'.join(textwrap.wrap(sequence, wrap))
+            seq = '\n'.join(textwrap.wrap(seq, wrap))
         print >> fp, header
         print >> fp, seq
         count += 1
