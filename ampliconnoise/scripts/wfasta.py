@@ -77,9 +77,9 @@ def build_parser(parent_subparsers):
     parser.add_argument('--repeat', action="store_true", default=False,
             help="Repeat each record [frequency] times (default %(default)s)")
     parser.add_argument('infile', type=argparse.FileType('r'),
-            help="Infile (default: stdin)", default=sys.stdin)
+            help="Infile")
     parser.add_argument('outfile', type=argparse.FileType('w'),
-            help="Outfile (default: stdout)", default=sys.stdout)
+            help="Outfile")
 
     return parser
 
