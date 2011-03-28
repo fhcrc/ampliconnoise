@@ -6,7 +6,8 @@ import itertools
 import re
 
 
-# Sequence in which nucleotides are flowed:
+# Complement of sequence in which nucleotides are flowed.
+# THe standard bases read would be ATGC
 FLOW_ORDER = 'TACG'
 
 # Sequence at the beginning of reads
@@ -78,8 +79,7 @@ class SFFRead(object):
         Return the bases associated with the flow records, trimmed
         to the right clip value
         """
-        rtrim = self.right_clip
-        return flow_to_seq(self.flows[:rtrim])
+        return flow_to_seq(self.flows[:self.right_clip])
 
     def validate(self):
         """

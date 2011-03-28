@@ -1,5 +1,5 @@
-``anoisetools``
-===============
+``ampliconnoise``
+=================
 
 Python package for prepping 454 data for use with `AmpiclonNoise`_::
 

@@ -10,6 +10,10 @@ Clean sff.txt or anoise raw data file:
 
 Creating an output .fasta and a .dat file, suitable for feeding into the
 AmpliconNoise C code.
+
+Per Quince et al, 2011,
+* For GS FLX runs, require min_flows of 360, max_flows of 360
+* For Titanium runs, require min_flows of 360, max_flows of 720
 """
 
 import argparse
@@ -20,8 +24,12 @@ import tempfile
 
 from ampliconnoise import sff, anoiseio
 
-DEFAULT_MIN_FLOWS = None
-DEFAULT_MAX_FLOWS = 360
+
+# Default minimum clean flows to keep a read
+DEFAULT_MIN_FLOWS = 360
+# Default maximum flows to keep
+DEFAULT_MAX_FLOWS = 720
+
 
 def build_parser(subparsers):
     """
