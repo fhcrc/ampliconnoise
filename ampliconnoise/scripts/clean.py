@@ -150,7 +150,7 @@ def invoke(reader, fa_handle, dat_path, primer, min_flows, max_flows):
     """
     good = 0
     bad = 0
-    primer_re = re.compile(r'^{0}.*({1}.*)'.format(sff.READ_BEGIN, primer))
+    primer_re = re.compile(r'^{0}.*?({1}.*)'.format(sff.READ_BEGIN, primer))
 
     # On the first pass, write to a temporary file: we'll need to include the
     # record count and maximum length at the beginning of the file later.
@@ -169,7 +169,7 @@ def invoke(reader, fa_handle, dat_path, primer, min_flows, max_flows):
             else:
                 bad += 1
 
-        print '{0} good records; {1} bad records'.format(good, bad)
+        print dat_path, '{0} good; {1} bad '.format(good, bad)
 
         # Second pass - add a line with number clean and maximum length
         dat_handle.seek(0)

@@ -12,7 +12,7 @@ def build_parser(subparsers):
 trims remaining sequence to <length> from FASTA-formatted sequences passed
 to stdin, printing to stdout.""")
     parser.add_argument('barcode', metavar='<tag>',
-            help='Sequence tag')
+            help='Sequence tag to remove if present. Interpreted as regex')
     parser.add_argument('length', metavar='<length>',
             help='Trim sequences to <length>', type=int)
     return parser
@@ -27,9 +27,14 @@ def trim(barcode, length, in_handle, out_handle):
     Note:
     Sequences passed must be on a single line.
     """
-    # trim leading G's #TODO: why
-    # barcode = barcode.lstrip('G')
+    # trim leading G's
+    # TODO: Follow up with Chris on why this is done.
+    #       it *is* needed.
+    # Likely: records are read TCAG, we trim the first 4 *flows*, which won't
+    # detect duplicate G's.
+    barcode = barcode.lstrip('G')
     lines = (line.rstrip() for line in in_handle)
+
     pattern = re.compile('{0}(.*)'.format(barcode))
 
     for line in lines:
@@ -39,11 +44,11 @@ def trim(barcode, length, in_handle, out_handle):
         else:
             m = pattern.match(line)
 
-            if not m:
-                raise ValueError("Unknown sequence: {0}".format(line))
+            if m:
+                line = m.group(1)
 
-            seq = m.group(1)
-            print >> out_handle, seq[:length]
+            print >> out_handle, line[:length]
+
 
 def main(parsed):
     """
