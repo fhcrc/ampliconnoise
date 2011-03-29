@@ -12,24 +12,57 @@ from ampliconnoise import fastaio
 
 WeightedFastaHeader = collections.namedtuple('WeightedFastaHeader',
         ('id', 'index', 'frequency'))
+
 _HEADER_RE = re.compile(r'^(.*?)_(\d+)_(\d+)$')
 
+def _parse_wfasta_header(line):
+    """
+    Parse wfasta header from the fasta id field
+    """
+    m = _HEADER_RE.match(line)
+    if not m:
+        raise ValueError("Invalid wfasta header: {0}".format(line))
+    i, index, freq = m.groups()
+    return WeightedFastaHeader(i, int(index), int(freq))
 
 class _WFastaWriter(object):
+    """
+    base class for WFasta writers
+    """
 
-    def __init__(self, fp, min_frequency, repeat):
+    def __init__(self, fp, min_frequency=None, repeat=False):
+        """
+        Initialize the writer with a destination file pointer,
+        minimum frequency to accept, and a boolean indicating whether
+        to repeat the sequence.
+        """
         self.fp = fp
         self.min_frequency = min_frequency
         self.repeat = repeat
 
     def writerecord(self, record):
+        """
+        Write a record to the output file.
+
+        This method should not need to be overridden - the real action
+        is in _WFastaWriter.write.
+        """
         header = _parse_wfasta_header(record.id)
         if (self.min_frequency is None or
                 header.frequency >= self.min_frequency):
             self.write(record)
 
+    def write(self, sequence):
+        """
+        Writes a sequence object to the output file.
+        """
+        raise NotImplementedError("Override in subclass")
+
 
 class _WFastaTabularWriter(_WFastaWriter):
+    """
+    Writer for tab-delimited text, with a header
+    """
 
     def __init__(self, fp, min_frequency, repeat):
         super(_WFastaTabularWriter, self).__init__(fp, min_frequency, repeat)
@@ -37,12 +70,18 @@ class _WFastaTabularWriter(_WFastaWriter):
         self.writer.writerow(('id', 'index', 'frequency', 'sequence'))
 
     def write(self, sequence):
+        """
+        Writes a sequence object to the output file in tab-delimited format.
+        """
         parsed_header = _parse_wfasta_header(sequence.id)
         self.writer.writerow((parsed_header.id, parsed_header.index,
                               parsed_header.frequency, sequence.seq))
 
 
 class _WFastaFastaWriter(_WFastaWriter):
+    """
+    Write the output in FASTA.
+    """
 
     def write(self, sequence):
         parsed_header = _parse_wfasta_header(sequence.id)
@@ -76,15 +115,18 @@ def build_parser(parent_subparsers):
             default="fasta")
     parser.add_argument('--repeat', action="store_true", default=False,
             help="Repeat each record [frequency] times (default %(default)s)")
-    parser.add_argument('infile', type=argparse.FileType('r'),
-            help="Infile")
-    parser.add_argument('outfile', type=argparse.FileType('w'),
-            help="Outfile")
+    parser.add_argument('--infile', type=argparse.FileType('r'),
+            help="Infile (default: stdin)", default=sys.stdin)
+    parser.add_argument('--outfile', type=argparse.FileType('w'),
+            help="Outfile (default: stdout)", default=sys.stdout)
 
     return parser
 
 
 def main(parsed):
+    """
+    Filters / converts the input file based on parsed command line arguments
+    """
     with parsed.infile:
         with parsed.outfile:
             writer_class = _OUTPUT_FORMATS[parsed.output_format]
@@ -93,14 +135,3 @@ def main(parsed):
 
             for sequence in fastaio.parse_fasta(parsed.infile):
                 writer.writerecord(sequence)
-
-
-def _parse_wfasta_header(line):
-    """
-    Parse wfasta header from the fasta id
-    """
-    m = _HEADER_RE.match(line)
-    if not m:
-        raise ValueError("Invalid wfasta header: {0}".format(line))
-    i, index, freq = m.groups()
-    return WeightedFastaHeader(i, int(index), int(freq))
