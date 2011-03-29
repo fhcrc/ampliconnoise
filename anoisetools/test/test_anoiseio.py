@@ -1,7 +1,7 @@
 
 import unittest
 
-from ampliconnoise import anoiseio, sff
+from anoisetools import anoiseio, sff
 
 
 class SplitKeysReaderTestCase(unittest.TestCase):

@@ -7,7 +7,7 @@ import collections
 import re
 import sys
 
-from ampliconnoise import fastaio
+from anoisetools import fastaio
 
 
 WeightedFastaHeader = collections.namedtuple('WeightedFastaHeader',

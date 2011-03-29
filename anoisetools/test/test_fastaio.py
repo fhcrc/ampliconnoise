@@ -1,6 +1,6 @@
 from cStringIO import StringIO
 import unittest
-from ampliconnoise import fastaio
+from anoisetools import fastaio
 
 
 FASTA_SEQS = """>gi|5524211|gb|AAD44166.1| cytochrome b [Elephas maximus maximus]

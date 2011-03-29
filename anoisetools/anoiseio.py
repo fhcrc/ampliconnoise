@@ -4,7 +4,7 @@ Tools for reading Ampliconnoise outputs
 import shutil
 import tempfile
 
-from ampliconnoise import sff
+from anoisetools import sff
 
 
 class AnoiseRawReader(object):

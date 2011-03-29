@@ -5,7 +5,7 @@ import argparse
 import os.path
 import sys
 
-from ampliconnoise import anoiseio
+from anoisetools import anoiseio
 
 
 def build_parser(subparsers):

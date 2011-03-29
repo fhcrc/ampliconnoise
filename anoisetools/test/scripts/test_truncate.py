@@ -1,7 +1,7 @@
 from cStringIO import StringIO
 import unittest
 
-from ampliconnoise.scripts import truncate
+from anoisetools.scripts import truncate
 
 class TrimTestCase(unittest.TestCase):
 

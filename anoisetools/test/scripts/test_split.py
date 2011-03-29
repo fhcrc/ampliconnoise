@@ -3,8 +3,8 @@ import shutil
 import tempfile
 import unittest
 
-from ampliconnoise import anoiseio
-from ampliconnoise.scripts import split
+from anoisetools import anoiseio
+from anoisetools.scripts import split
 
 def _line_iterator(s):
     return iter(s.splitlines())

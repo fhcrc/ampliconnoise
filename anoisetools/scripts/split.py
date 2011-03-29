@@ -22,7 +22,7 @@ import os.path
 import re
 import sys
 
-from ampliconnoise import sff, anoiseio
+from anoisetools import sff, anoiseio
 
 
 class _FlowerWriter(object):

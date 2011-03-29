@@ -1,6 +1,6 @@
 import unittest
 
-from ampliconnoise import sff
+from anoisetools import sff
 
 class TestFlowToSeq(unittest.TestCase):
 

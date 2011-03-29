@@ -22,7 +22,7 @@ import shutil
 import sys
 import tempfile
 
-from ampliconnoise import sff, anoiseio
+from anoisetools import sff, anoiseio
 
 
 # Default minimum clean flows to keep a read
