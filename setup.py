@@ -3,11 +3,11 @@
 import glob
 from distutils.core import setup
 
-setup(name = 'ampliconnoise',
+setup(name = 'anoisetools',
       version = '0.1',
       author = 'Connor McCoy',
       author_email = 'cmccoy@fhcrc.org',
-      packages = ['ampliconnoise', 'ampliconnoise.test'],
+      packages = ['anoisetools', 'anoisetools.test'],
       requires = ['Python (>= 2.7)'],
       scripts = glob.glob('scripts/*'),
       )
