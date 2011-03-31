@@ -117,18 +117,17 @@ The default arguments correspond to the recommended values for Titanium runs.
 
 ::
 
-  usage: anoise truncate [-h] <tag> <length>
+    usage: anoise truncate [-h] <tag> <length>
 
-  Removes sequence <tag>, trims remaining sequence to <length> from FASTA-
-  formatted sequences passed to stdin, printing to stdout.
+    Removes sequence <tag>, trims remaining sequence to <length> from FASTA-
+    formatted sequences passed to stdin, printing to stdout.
 
-  positional arguments:
-    <tag>       Sequence tag
-    <length>    Trim sequences to <length>
+    positional arguments:
+      <tag>       Sequence tag to remove if present. Interpreted as regex
+      <length>    Trim sequences to <length>
 
-  optional arguments:
-    -h, --help  show this help message and exit
-
+    optional arguments:
+      -h, --help  show this help message and exit
 
 ``wfasta``
 ^^^^^^^^^^
