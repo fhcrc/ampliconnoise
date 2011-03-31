@@ -7,7 +7,7 @@ setup(name = 'anoisetools',
       version = '0.1',
       author = 'Connor McCoy',
       author_email = 'cmccoy@fhcrc.org',
-      packages = ['anoisetools', 'anoisetools.scripts', 'anoisetools.test'],
+      packages = ['anoisetools', 'anoisetools.test', 'anoisetools.scripts'],
       requires = ['Python (>= 2.7)'],
       scripts = glob.glob('scripts/*'),
       )

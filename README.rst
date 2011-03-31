@@ -13,8 +13,8 @@ Installation
 1. Make sure your system meets the requirements (currently, just Python version 2.7)
 2. Run::
 
-    git clone git://github.com/fhcrc/ampiclonnoise.git
-    cd anoisetools && python2.7 setup.py
+    git clone git://github.com/fhcrc/ampliconnoise.git
+    cd ampliconnoise && python2.7 setup.py
 
 Running setup.py installs the ``anoisetools`` package, mostly accessible from
 the ``anoise`` script.

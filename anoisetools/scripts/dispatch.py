@@ -10,7 +10,7 @@ def main(args=sys.argv[1:]):
     Parses arguments, passes execution to the appropriate subcommand.
     """
     parser = argparse.ArgumentParser(description="""Prepare data for use with
-AmpiclonNoise""")
+AmpliconNoise""")
     subparsers = parser.add_subparsers(title='Commands', help="Valid commands")
 
     modules = __import__(__package__, fromlist=SUBCOMMANDS)
