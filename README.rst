@@ -7,10 +7,16 @@ Python package for prepping 454 data for use with `AmpliconNoise`_::
 
 The source for `AmpliconNoise`_ is also included.
 
+For decoded flowgram data, we target the output of `Flower`_, an open-source
+alternative to ``sffinfo``. Note that the output of Flower and the output
+of ``sffinfo`` are not compatible.
+
+
 Installation
 ------------
 
-1. Make sure your system meets the requirements (currently, just Python version 2.7)
+1. Make sure your system meets the requirements (currently, just Python  
+   version 2.7)
 2. Run::
 
     git clone git://github.com/fhcrc/ampliconnoise.git
@@ -132,7 +138,7 @@ The default arguments correspond to the recommended values for Titanium runs.
 ``wfasta``
 ^^^^^^^^^^
 
-``wfasta`` works with the output files from ``SeqNoise``, 
+``wfasta`` works with the output files from ``SeqNoise`` and ``PyroNoise``,
 providing methods to strip records below a minimum frequency,
 transform the FASTA file to a tabular format, and/or repeat
 the records based on the observed frequency.
