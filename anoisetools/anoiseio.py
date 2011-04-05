@@ -40,15 +40,15 @@ class AnoiseRawReader(object):
             yield record
 
 
-def _record_to_anoise_raw(record):
+def _record_to_anoise_raw(seq_record):
     """
     Generates a string suitable for using as input to AmpliconNoise,
     consisting of the identifier, a newline, the integer length of the
     flow, a space, and the float flow readings.
     """
     return '>{identifier}\n{length} {flow}'.format(
-            identifier=record.identifier, length=record.right_clip,
-            flow=record._flow_to_string())
+            identifier=seq_record.id, length=seq_record.annotations['clip_qual_right'],
+            flow=sff.flows_to_string(seq_record))
 
 
 class AnoiseRawWriter(object):

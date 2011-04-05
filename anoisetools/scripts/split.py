@@ -22,6 +22,8 @@ import os.path
 import re
 import sys
 
+from Bio import SeqIO
+
 from anoisetools import sff, anoiseio
 
 
@@ -236,7 +238,7 @@ def main(parsed_args):
     with contextlib.closing(splitter):
         splitter.open()
         with parsed_args.sff_file:
-            reader = sff.parse_flower(parsed_args.sff_file)
+            reader = SeqIO.parse(parsed_args.sff_file, 'sff')
             result = splitter.split(reader)
 
     # Special treatment for unmatched records

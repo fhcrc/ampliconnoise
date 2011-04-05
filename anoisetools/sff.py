@@ -4,6 +4,7 @@ Tools for working with raw flower output.
 
 import itertools
 import re
+import warnings
 
 
 # Complement of sequence in which nucleotides are flowed.
@@ -28,10 +29,33 @@ def flow_to_seq(flowgram, flow_order=FLOW_ORDER):
     # Build the sequence
     for read_value, base in zip(flowgram, bases):
         # Get base counts: round to the nearest integer value
-        signal = int(round(read_value, 0))
+        if isinstance(read_value, float):
+            signal = int(round(read_value, 0))
+        else:
+            # Integer float values from BioPython -
+            # float value * 100
+            signal = int(round(read_value, -2) / 100)
         result.extend([base] * signal)
 
     return ''.join(result)
+
+
+def bases_from_flows(seq_record):
+    """
+    Return the bases associated with the flow records, trimmed
+    to the right clip value
+    """
+    right_clip = seq_record.annotations['clip_qual_right']
+    return flow_to_seq(seq_record.annotations['flow_values'][:right_clip])
+
+def flows_to_string(seq_record):
+    """
+    Return the flows
+    """
+    flows = seq_record.annotations['flow_values']
+    flows = [float(i) / 100 for i in flows]
+    string_flows = ['{0:.2f}'.format(i) for i in flows]
+    return ' '.join(string_flows)
 
 
 class SFFRead(object):
@@ -43,6 +67,7 @@ class SFFRead(object):
                  'flows', 'index', 'bases', 'quals']
 
     def __init__(self, identifier):
+        warnings.warn("Pending deprecation")
         self.identifier = identifier
         self.info = None
         self.clip = None
@@ -131,6 +156,7 @@ def parse_flower(iterable):
     Reads an input containing lines from a flower sff.txt output,
     returning a generator of FlowerRecords contained in the input.
     """
+    warnings.warn("Deprecated")
     # Possible TODO: track line numbers for reporting errors?
     header = next(iterable)
     if not _is_header(header):
