@@ -26,19 +26,8 @@ from Bio import SeqIO
 
 from anoisetools import sff, anoiseio
 
-
-class _FlowerWriter(object):
-    def __init__(self, fp, *args):
-        self._fp = fp
-
-    def write(self, record):
-        print >> self._fp, str(record)
-
-    def close(self):
-        self._fp.close()
-
 # Output formatters - each takes a record, returns a string to write
-WRITERS = {'flower': _FlowerWriter, 'anoise_raw': anoiseio.AnoiseRawWriter}
+WRITERS = {'anoise_raw': anoiseio.AnoiseRawWriter}
 
 
 def build_parser(subparsers):
@@ -198,8 +187,9 @@ class SFFRunSplitter(object):
 
     def split(self, iterable):
         """
-        Takes an iterable generating :ref:`ampliconnoise.sff.SFFRead`s,
-        writes them to a set of output files
+        Takes an iterable generating ``Bio.SeqRecord.SeqRecord`` objects
+        writes them to a set of output files.
+
         returns a dictionary of mapping barcode -> # of reads
         """
         counts = collections.defaultdict(int)
@@ -231,7 +221,8 @@ def main(parsed_args):
     with parsed_args.barcode_file:
         barcodes = _load_barcodes(parsed_args.barcode_file)
 
-    splitter = SFFRunSplitter(barcodes, parsed_args.primer, parsed_args.output_directory,
+    splitter = SFFRunSplitter(barcodes, parsed_args.primer,
+                              parsed_args.output_directory,
                               parsed_args.unmatched_name, writer)
 
     # Run
