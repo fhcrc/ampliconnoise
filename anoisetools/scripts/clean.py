@@ -53,10 +53,6 @@ trim."""
     parser.add_argument('--input', metavar='INPUT', default=sys.stdin,
             type=argparse.FileType('r'),
             help='Input data file (default: stdin)')
-    parser.add_argument('--flower-input', action='store_true',
-            help='Input is in flower-decoded .sff.txt format '
-                 '(default: %(default)s)',
-            default=False)
     return parser
 
 
@@ -184,10 +180,7 @@ def main(parsed):
     Check arguments, call invoke(...)
     """
     try:
-        if parsed.flower_input:
-            reader = sff.parse_flower(parsed.input)
-        else:
-            reader = anoiseio.AnoiseRawReader(parsed.input)
+        reader = anoiseio.AnoiseRawReader(parsed.input)
         with open(parsed.outname + '.fa', 'w') as fasta_handle:
             invoke(reader, fasta_handle, parsed.outname + '.dat',
                    parsed.primer, parsed.min_flows, parsed.max_flows)

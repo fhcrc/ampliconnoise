@@ -1,7 +1,7 @@
 """
 Given the input:
 
-  * A flower-converted Standard Flowgram File
+  * A Standard Flowgram File
   * A file containing mappings from DNA sequence barcodes to a meaningful
     identifier
   * A regular expression to identify the primer sequence used
@@ -49,7 +49,7 @@ def build_parser(subparsers):
     # Optional arguments
     parser.add_argument('--sff-file', metavar='SFF_TXT', default=sys.stdin,
             type=argparse.FileType('r'),
-            help='Flower-decoded SFF text file. Default: stdin')
+            help='SFF file. Default: stdin')
     parser.add_argument('--output-directory', metavar='DIR', default='.',
             help='Output directory for split files (default: %(default)s)')
     parser.add_argument('--output-format', metavar='FORMAT',

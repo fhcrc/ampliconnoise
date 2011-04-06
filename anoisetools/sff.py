@@ -1,5 +1,5 @@
 """
-Tools for working with raw flower output.
+Tools for working with raw SFF files
 """
 
 import itertools
