@@ -4,6 +4,10 @@ Tools for reading Ampliconnoise outputs
 import shutil
 import tempfile
 
+from Bio.Alphabet import generic_dna
+from Bio.Seq import Seq
+from Bio.SeqRecord import SeqRecord
+
 from anoisetools import sff
 
 
@@ -17,7 +21,7 @@ class AnoiseRawReader(object):
 
     This function skips the first record, only returning the flow.
 
-    Record length is truncated to flow_count
+    Yields BioPython SeqRecords
     """
     def __init__(self, fp):
         self._fp = (i.rstrip('\n') for i in fp)
@@ -34,9 +38,12 @@ class AnoiseRawReader(object):
             flow_length = int(split_line[0])
             flows = split_line[1:flow_length + 1]
             flows = map(float, flows)
-            record = sff.SFFRead(header)
-            record.flows = flows
-            record.clip = [1, flow_length]
+            bases = sff.flow_to_seq(flows)
+            sequence = Seq(bases, generic_dna)
+            record = SeqRecord(sequence, id=header)
+            # Add flows and clip as annotations
+            record.annotations['flow_values'] = [int(i * 100) for i in flows]
+            record.annotations['clip_qual_right'] = flow_length
             yield record
 
 
@@ -47,7 +54,8 @@ def _record_to_anoise_raw(seq_record):
     flow, a space, and the float flow readings.
     """
     return '>{identifier}\n{length} {flow}'.format(
-            identifier=seq_record.id, length=seq_record.annotations['clip_qual_right'],
+            identifier=seq_record.id,
+            length=seq_record.annotations['clip_qual_right'],
             flow=sff.flows_to_string(seq_record))
 
 

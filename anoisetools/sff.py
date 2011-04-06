@@ -48,6 +48,7 @@ def bases_from_flows(seq_record):
     right_clip = seq_record.annotations['clip_qual_right']
     return flow_to_seq(seq_record.annotations['flow_values'][:right_clip])
 
+
 def flows_to_string(seq_record):
     """
     Return the flows
