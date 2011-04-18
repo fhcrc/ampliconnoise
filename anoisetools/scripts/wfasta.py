@@ -90,8 +90,8 @@ class _WFastaFastaWriter(_WFastaWriter):
         towrite = []
         if self.repeat is True:
             for i in xrange(parsed_header.frequency):
-                new_header = '{0}_{1}'.format(record.id, i)
-                towrite.append(fastaio.Sequence(new_header, record.seq))
+                new_header = '{0}_{1}'.format(sequence.id, i)
+                towrite.append(fastaio.Sequence(new_header, sequence.seq))
         else:
             towrite.append(sequence)
 
