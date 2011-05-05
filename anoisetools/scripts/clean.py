@@ -22,6 +22,8 @@ import shutil
 import sys
 import tempfile
 
+from Bio import SeqIO
+
 from anoisetools import sff, anoiseio
 
 
@@ -29,6 +31,10 @@ from anoisetools import sff, anoiseio
 DEFAULT_MIN_FLOWS = 360
 # Default maximum flows to keep
 DEFAULT_MAX_FLOWS = 720
+
+
+class RejectedSequenceError(ValueError):
+    pass
 
 
 def build_parser(subparsers):
@@ -53,6 +59,10 @@ trim."""
     parser.add_argument('--input', metavar='INPUT', default=sys.stdin,
             type=argparse.FileType('r'),
             help='Input data file (default: stdin)')
+    parser.add_argument('--save-rejected', metavar='FASTQ',
+            dest="rej_handle",
+            help='Save rejected files in FASTQ format',
+            type=argparse.FileType('w'))
     return parser
 
 
@@ -121,12 +131,17 @@ def handle_record(flows, primer_re, min_flows, max_flows):
     written to the FASTA file, and a set of flows trimmed to
     max_flows length.
 
-    Otherwise, returns ``(None, None)``
+    Raises RejectedSequenceError on invalid sequence.
     """
     trimmed_flows = trim_noise(flows)
+    trimmed = len(trimmed_flows) != len(flows)
+    if min_flows is not None and len(trimmed_flows) < min_flows:
+        raise RejectedSequenceError("Ins. Flows. Bad Flowgram: {0}".format(trimmed))
+
     trimmed_reading = sff.flow_to_seq(trimmed_flows)
 
     m = primer_re.match(trimmed_reading)
+
     if (min_flows is None or len(trimmed_flows) >= min_flows) and m:
         sequence = m.group(1)
 
@@ -136,10 +151,11 @@ def handle_record(flows, primer_re, min_flows, max_flows):
 
         return (sequence, flow_result)
     else:
-        return (None, None)
+        raise RejectedSequenceError("No primer match")
 
 
-def invoke(reader, fa_handle, dat_path, primer, min_flows, max_flows):
+def invoke(reader, fa_handle, rej_handle, dat_path, , primer, min_flows,
+           max_flows):
     """
     Main routine. Loop over the records in reader, write good results to
     fa_handle and dat_handle respectively.
@@ -152,8 +168,12 @@ def invoke(reader, fa_handle, dat_path, primer, min_flows, max_flows):
     # record count and maximum length at the beginning of the file later.
     with tempfile.TemporaryFile() as dat_handle:
         for record in reader:
-            sequence, flows = handle_record(record.flows, primer_re,
-                                            min_flows, max_flows)
+            try:
+                sequence, flows = handle_record(record.flows, primer_re,
+                                                min_flows, max_flows)
+            except RejectedSequenceError:
+                if rej_handle:
+                    SeqIO.write([sequence], rej_handle, 'fastq')
             if sequence and flows:
                 # Write FASTA
                 print >> fa_handle, '>{0}\n{1}'.format(record.identifier,
@@ -182,7 +202,7 @@ def main(parsed):
     try:
         reader = anoiseio.AnoiseRawReader(parsed.input)
         with open(parsed.outname + '.fa', 'w') as fasta_handle:
-            invoke(reader, fasta_handle, parsed.outname + '.dat',
+            invoke(reader, fasta_handle, parsed.rej_handle, parsed.outname + '.dat',
                    parsed.primer, parsed.min_flows, parsed.max_flows)
     finally:
         parsed.input.close()
