@@ -60,36 +60,57 @@ trim."""
     return parser
 
 
-# Possible TODO: Make the thresholds configurable
-def is_flowgram_valid(flowgram, high_signal_cutoff=9.49,
-                      low_signal_cutoff=0.7, signal_start=0.5):
+class FlowgramFilter(object):
     """
-    Checks for a valid flowgram, defined as:
-    * no reads above high_signal_cutoff
-    * no reads in (signal_start, low_signal_cutoff)
-    * At least one bp read
+    Instrumented flowgram filter
     """
 
-    # Check arguments
-    if len(flowgram) > 4:
-        raise ValueError("Unexpected flowgram length: {0}".format(
-            len(flowgram)))
+    def __init__(self, high_signal_cutoff=9.49, low_signal_cutoff=0.7,
+            signal_start=0.5):
+        self.high_signal_cutoff = high_signal_cutoff
+        self.low_signal_cutoff = low_signal_cutoff
+        self.signal_start = signal_start
 
-    # Number of noisy reads
-    noisy = 0
-    # Number of items in flowgram with signal
-    signal = 0
+        self.empty_flow = 0
+        self.high_signal = 0
+        self.ambiguous_flow = 0
 
-    for read in flowgram:
-        if read > signal_start:
-            # Positive reading (1+ nucleotides present)
-            signal += 1
+    def is_flowgram_valid(self, flowgram):
+        """
+        Checks for a valid flowgram, defined as:
+        * no reads above high_signal_cutoff
+        * no reads in (signal_start, low_signal_cutoff)
+        * At least one bp read
+        """
 
-            # Check for noise
-            if read < low_signal_cutoff or read > high_signal_cutoff:
-                noisy += 1
+        # Check arguments
+        if len(flowgram) > 4:
+            raise ValueError("Unexpected flowgram length: {0}".format(
+                len(flowgram)))
 
-    return noisy == 0 and signal > 0
+        # Number of noisy reads
+        noisy = 0
+
+        # Number of items in flowgram with signal
+        signal = 0
+
+        for flow in flowgram:
+            if flow > self.signal_start:
+                # Positive reading (1+ nucleotides present)
+                signal += 1
+
+                # Check for noise
+                if flow < self.low_signal_cutoff:
+                    self.ambiguous_flow += 1
+                    return False
+                if flow > self.high_signal_cutoff:
+                    self.high_signal += 1
+                    return False
+
+        if signal == 0:
+            self.ambiguous_flow += 1
+
+        return noisy == 0 and signal > 0
 
 
 def trim_noise(flows):
@@ -97,6 +118,7 @@ def trim_noise(flows):
     Trims a list of flows to the first noisy flowgram found
     """
     flowgram_size = 4
+    flowgram_filter = FlowgramFilter()
 
     # Iterate through the reads in groups of 4,
     # Making sure that there's
@@ -105,7 +127,7 @@ def trim_noise(flows):
     for i in xrange(0, len(flows), flowgram_size):
         flowgram = flows[i:i + flowgram_size]
 
-        if not is_flowgram_valid(flowgram):
+        if not flowgram_filter.is_flowgram_valid(flowgram):
             # Return all data up to this point
             return flows[:i]
 
