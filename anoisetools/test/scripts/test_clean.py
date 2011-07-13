@@ -2,39 +2,39 @@
 Tests for clean.py
 """
 
-from cStringIO import StringIO
-import os.path
 import re
 import unittest
 
-from anoisetools import sff
 from anoisetools.scripts import clean
 
 
 class TestFlowgramValid(unittest.TestCase):
+    def setUp(self):
+        self.flowgram_filter = clean.FlowgramFilter()
+
     def test_basic(self):
         flowgram = [1.0, 1.0, 0.0, 1.0]
-        self.assertEquals(True, clean.is_flowgram_valid(flowgram))
+        self.assertEquals(True, self.flowgram_filter.is_valid(flowgram))
 
     def test_high_signal(self):
         flowgram_accept = [1.0, 1.0, 9.49, 0.2]
         flowgram_reject = [1.0, 1.0, 9.51, 0.2]
-        self.assertEquals(True, clean.is_flowgram_valid(flowgram_accept))
-        self.assertEquals(False, clean.is_flowgram_valid(flowgram_reject))
+        self.assertEquals(True, self.flowgram_filter.is_valid(flowgram_accept))
+        self.assertEquals(False, self.flowgram_filter.is_valid(flowgram_reject))
 
     def test_low_signal(self):
         flowgram_accept = [1.0, 1.0, 1.0, 0.7]
         flowgram_reject = [1.0, 1.0, 1.0, 0.6]
-        self.assertEquals(True, clean.is_flowgram_valid(flowgram_accept))
-        self.assertEquals(False, clean.is_flowgram_valid(flowgram_reject))
+        self.assertEquals(True, self.flowgram_filter.is_valid(flowgram_accept))
+        self.assertEquals(False, self.flowgram_filter.is_valid(flowgram_reject))
 
     def test_no_signal(self):
         flowgram_nosignal = [0.0] * 4
-        self.assertEquals(False, clean.is_flowgram_valid(flowgram_nosignal))
+        self.assertEquals(False, self.flowgram_filter.is_valid(flowgram_nosignal))
 
     def test_arg_count(self):
         self.assertRaisesRegexp(ValueError, "^Unexpected flowgram length",
-                clean.is_flowgram_valid, range(5))
+                self.flowgram_filter.is_valid, range(5))
 
 class TestHandleRecord(unittest.TestCase):
 
@@ -91,16 +91,12 @@ class TestHandleRecord(unittest.TestCase):
                 1.20, 0.11, 0.15, 2.01, 0.15, 2.13, 0.04, 0.14, 1.03, 0.07,
                 0.89, 0.08, 1.01, 0.20, 0.94, 1.09, 0.96, 0.14]
 
-    def tearDown(self):
-        pass
 
     def test_min_length(self):
         assert len(self.flows) >= 400
-
-        regex = re.compile('^TCAG.*?(A.*)')
-        actual = clean.handle_record(self.flows, regex, 400, 600)
-        self.assertTrue(actual[0] is not None)
-        self.assertTrue(actual[1] is not None)
+        flowgram_filter = clean.FlowgramFilter()
+        actual = flowgram_filter.filter_record(self.flows)
+        self.assertTrue(len(actual) > 0)
         # TODO: Expand
 
 

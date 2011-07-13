@@ -30,6 +30,7 @@ DEFAULT_MIN_FLOWS = 360
 # Default maximum flows to keep
 DEFAULT_MAX_FLOWS = 720
 
+FLOWGRAM_SIZE = 4
 
 def build_parser(subparsers):
     """
@@ -48,6 +49,8 @@ trim."""
             "default: %(default)s", default=DEFAULT_MAX_FLOWS)
     parser.add_argument('primer', metavar='PRIMER',
             help="Regexp to identify primer sequence")
+    parser.add_argument('--max-empty',
+            type=int, default=0, help="""Maximum empty flowgrams (default: %(default)s)""")
     parser.add_argument('outname', metavar="OUTNAME",
             help="base name for output files - OUTNAME.fa and OUTNAME.dat")
     parser.add_argument('--input', metavar='INPUT', default=sys.stdin,
@@ -62,141 +65,142 @@ trim."""
 
 class FlowgramFilter(object):
     """
-    Instrumented flowgram filter
+    Instrumented flowgram filter_record
     """
 
-    def __init__(self, high_signal_cutoff=9.49, low_signal_cutoff=0.7,
-            signal_start=0.5):
+    def __init__(self, primer_re=None, high_signal_cutoff=9.49,
+            low_signal_cutoff=0.7, signal_start=0.5, max_empty=0, min_flows =
+            DEFAULT_MIN_FLOWS, max_flows=DEFAULT_MAX_FLOWS):
         self.high_signal_cutoff = high_signal_cutoff
         self.low_signal_cutoff = low_signal_cutoff
         self.signal_start = signal_start
 
+        self.primer_re = primer_re or re.compile('.')
+        self.min_flows = min_flows
+        self.max_flows = max_flows
+        self.max_empty = max_empty
+
         self.empty_flow = 0
         self.high_signal = 0
         self.ambiguous_flow = 0
+        self.passed = 0
+        self.failed = 0
 
-    def is_flowgram_valid(self, flowgram):
+    def is_empty(self, flowgram):
         """
-        Checks for a valid flowgram, defined as:
-        * no reads above high_signal_cutoff
-        * no reads in (signal_start, low_signal_cutoff)
-        * At least one bp read
+        Returns true if the flowgram has no signal
         """
+        r = all(i < self.signal_start for i in flowgram)
+        if r:
+            self.empty_flow += 1
+        return r
 
-        # Check arguments
-        if len(flowgram) > 4:
+    def is_high(self, flowgram):
+        """
+        Returns true if the flowgram contains any excessively high values
+        """
+        r = any(i > self.high_signal_cutoff for i in flowgram)
+        if r:
+            self.high_signal += 1
+        return r
+
+    def is_ambiguous(self, flowgram):
+        """
+        Returns true if the flowgram contains any ambiguous values
+        """
+        r =  any(i > self.signal_start and i < self.low_signal_cutoff
+                   for i in flowgram)
+        if r:
+            self.ambiguous_flow += 1
+        return r
+
+    def is_valid(self, flowgram):
+        if not len(flowgram) <= FLOWGRAM_SIZE:
             raise ValueError("Unexpected flowgram length: {0}".format(
                 len(flowgram)))
 
-        # Number of noisy reads
-        noisy = 0
+        return not (self.is_empty(flowgram) or self.is_high(flowgram) or
+                    self.is_ambiguous(flowgram))
 
-        # Number of items in flowgram with signal
-        signal = 0
+    def _clean_flow_iter(self, flows):
+        """
+        Generator of cleaned flowgrams
+        """
+        empty_count = 0
 
-        for flow in flowgram:
-            if flow > self.signal_start:
-                # Positive reading (1+ nucleotides present)
-                signal += 1
+        flowgrams = (flows[i:i + FLOWGRAM_SIZE]
+                     for i in xrange(0, len(flows), FLOWGRAM_SIZE))
+        for flowgram in flowgrams:
+            if self.is_empty(flowgram):
+                self.empty_flow += 1
+                empty_count += 1
 
-                # Check for noise
-                if flow < self.low_signal_cutoff:
-                    self.ambiguous_flow += 1
-                    return False
-                if flow > self.high_signal_cutoff:
-                    self.high_signal += 1
-                    return False
+                # If maximum empty flowgram count exceeded, stop
+                if empty_count > self.max_empty:
+                    break
+                else:
+                    continue
 
-        if signal == 0:
-            self.ambiguous_flow += 1
+            # Handle high and ambiguous flowgrams
+            # For now, just truncate when seen
+            if not self.is_high(flowgram) and not self.is_ambiguous(flowgram):
+                yield flowgram
+            else:
+                break
 
-        return noisy == 0 and signal > 0
+    def filter_record(self, flows):
+        return [flow for flowgram in self._clean_flow_iter(flows)
+                for flow in flowgram]
 
+    def filter_records(self, records):
+        for record in records:
+            record.flows = self.filter_record(record.flows)
+            trimmed_reading = sff.flow_to_seq(record.flows)
 
-def trim_noise(flows):
-    """
-    Trims a list of flows to the first noisy flowgram found
-    """
-    flowgram_size = 4
-    flowgram_filter = FlowgramFilter()
+            m = self.primer_re.match(trimmed_reading)
+            if (self.min_flows is None or len(record.flows) >= self.min_flows) and m:
+                sequence = m.group(1)
 
-    # Iterate through the reads in groups of 4,
-    # Making sure that there's
-    # A) 1+ with signal above threshold
-    # B) 0 with excessively high or low signal
-    for i in xrange(0, len(flows), flowgram_size):
-        flowgram = flows[i:i + flowgram_size]
+                # Truncate the flow result to a maximum length
+                # Note that the FASTA result is unchanged
+                flow_result = record.flows[:self.max_flows]
 
-        if not flowgram_filter.is_flowgram_valid(flowgram):
-            # Return all data up to this point
-            return flows[:i]
-
-    # No invalid flowgrams found: return the whole sequence
-    return flows
-
-
-def handle_record(flows, primer_re, min_flows, max_flows):
-    """
-    Processes a record, checks for validity and returns the result
-
-    primer_re must return a single group containing the primer
-    and remainder of the sequence
-
-    If the record has good data and meets the min_flows requirement:
-    Returns a length-2 tuple containing the sequence to be
-    written to the FASTA file, and a set of flows trimmed to
-    max_flows length.
-
-    Otherwise, returns ``(None, None)``
-    """
-    trimmed_flows = trim_noise(flows)
-    trimmed_reading = sff.flow_to_seq(trimmed_flows)
-
-    m = primer_re.match(trimmed_reading)
-    if (min_flows is None or len(trimmed_flows) >= min_flows) and m:
-        sequence = m.group(1)
-
-        # Truncate the flow result to a maximum length
-        # Note that the FASTA result is unchanged
-        flow_result = trimmed_flows[:max_flows]
-
-        return (sequence, flow_result)
-    else:
-        return (None, None)
+                self.passed += 1
+                yield (record.identifier, sequence, flow_result)
+            else:
+                self.failed += 1
 
 
-def invoke(reader, fa_handle, dat_path, primer, min_flows, max_flows):
+def invoke(reader, fa_handle, dat_path, primer, min_flows, max_flows,
+        max_empty):
     """
     Main routine. Loop over the records in reader, write good results to
     fa_handle and dat_handle respectively.
     """
-    good = 0
-    bad = 0
     primer_re = re.compile(r'^{0}.*?({1}.*)'.format(sff.READ_BEGIN, primer))
+    flowgram_filter = FlowgramFilter(primer_re, min_flows=min_flows,
+            max_flows=max_flows, max_empty=max_empty)
+
+    cleaned_iter = flowgram_filter.filter_records(reader)
 
     # On the first pass, write to a temporary file: we'll need to include the
     # record count and maximum length at the beginning of the file later.
     with tempfile.TemporaryFile() as dat_handle:
-        for record in reader:
-            sequence, flows = handle_record(record.flows, primer_re,
-                                            min_flows, max_flows)
-            if sequence and flows:
-                # Write FASTA
-                print >> fa_handle, '>{0}\n{1}'.format(record.identifier,
-                                                       sequence)
-                # Write data
-                print >> dat_handle, record.identifier, len(flows),
-                print >> dat_handle, ' '.join(map('{:.2f}'.format, flows))
-                good += 1
-            else:
-                bad += 1
+        for identifier, sequence, flows in cleaned_iter:
+            # Write FASTA
+            print >> fa_handle, '>{0}\n{1}'.format(identifier,
+                                                   sequence)
+            # Write data
+            print >> dat_handle, identifier, len(flows),
+            print >> dat_handle, ' '.join(map('{:.2f}'.format, flows))
 
-        print dat_path, '{0} good; {1} bad '.format(good, bad)
+        print dat_path, '{0} passed; {1} failed'.format(flowgram_filter.passed,
+                flowgram_filter.failed)
 
         # Second pass - add a line with number clean and maximum length
         dat_handle.seek(0)
         with open(dat_path, 'w') as dat_fp:
-            print >> dat_fp, good, max_flows
+            print >> dat_fp, flowgram_filter.passed, max_flows
             # Copy from temp file to final file
             shutil.copyfileobj(dat_handle, dat_fp)
 
@@ -212,6 +216,7 @@ def main(parsed):
             reader = anoiseio.AnoiseRawReader(parsed.input)
         with open(parsed.outname + '.fa', 'w') as fasta_handle:
             invoke(reader, fasta_handle, parsed.outname + '.dat',
-                   parsed.primer, parsed.min_flows, parsed.max_flows)
+                   parsed.primer, parsed.min_flows, parsed.max_flows,
+                   parsed.max_empty)
     finally:
         parsed.input.close()
