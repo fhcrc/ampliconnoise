@@ -1,213 +1,201 @@
 """
-Given the input:
-
-  * A Standard Flowgram File
-  * A file containing mappings from DNA sequence barcodes to a meaningful
-    identifier
-  * A regular expression to identify the primer sequence used
-
-Writes to a series of files named after the meaningful identifiers provided,
-each containing only those sequences from the input sff with the matching
-barcode.
-
-Any unmatched sequences are written to a separate file
+Split input FASTA files
 """
+
 import argparse
 import collections
-import contextlib
 import csv
-import errno
+import logging
+import multiprocessing
 import os
 import os.path
+import Queue
 import re
-import sys
 
 from Bio import SeqIO
 
-from anoisetools import sff, anoiseio
 
-# Output formatters - each takes a record, returns a string to write
-WRITERS = {'anoise_raw': anoiseio.AnoiseRawWriter}
+class SequenceWriter(object):
+    """
+    SequenceWriter writes sequences.
+
+    Designed to be run as a subprocess, instances are initialized with a
+    queue from which to draw sequences, an output file path, and an output
+    format.
+
+    Records are read from the queue and written to the output file until
+    None is encountered in the queue.
+    """
+
+    def __init__(self, queue, path, sequence_format):
+        self.count = multiprocessing.Value('i', 0)
+        self.queue = queue
+        self.path = path
+        self.sequence_format = sequence_format
+        self.cancel = False
+
+    def __iter__(self):
+        """
+        Yield sequences from the input queue
+        """
+        while True:
+            if self.cancel:
+                break
+            try:
+                # Try to pull a new item, waiting two seconds
+                record = self.queue.get(True, 2)
+                if record is None:
+                    break
+                self.count.value += 1
+                yield record
+            except Queue.Empty:
+                pass
+
+    def write(self):
+        """
+        Write sequences passed to the input queue to self.path
+        """
+        SeqIO.write(iter(self), self.path, self.sequence_format)
+
+
+def load_barcodes(fp):
+    d = {}
+    reader = csv.reader(fp)
+    for record in reader:
+        value, key = record[:2]
+        if key in d:
+            raise ValueError("Duplicate key: {0}".format(key))
+        if value in d.values():
+            raise ValueError("Duplicate value: {0}".format(value))
+        d[key] = value
+
+    return d
+
+class AlreadyOpenError(BaseException):
+    """
+    Indicates that the object was already opened
+    """
+    pass
+
+
+class SequenceSplitter(object):
+    """
+    Splits sequence files by barcode
+    """
+    barcode_start = 4
+
+    def __init__(self, primer, barcodes, make_dirs=False,
+            unmatched_name="unknown.sff", output_format='sff'):
+        self.barcodes = barcodes
+
+        min_len = min(len(barcode) for barcode in barcodes)
+        max_len = max(len(barcode) for barcode in barcodes)
+        self.primer = primer
+        self.barcode_re = re.compile(
+                '^(.{{{0},{1}}}){2}'.format(min_len, max_len, primer),
+                re.IGNORECASE)
+        self._output_files = {}
+        self.output_format = output_format
+        self.make_dirs = make_dirs
+        self.unmatched_name = unmatched_name
+
+    def open(self):
+        """
+        Create a subprocess running a SequenceWriter for each barcode.
+        """
+        if self._output_files:
+            raise AlreadyOpenError("SequenceSplitter has already been opened.")
+
+        writer_templates = []
+
+        # Build a list of barcode, filepath tuples to construct writers from
+        for barcode, identifier in self.barcodes.items():
+            path = identifier + '.' + self.output_format
+            if self.make_dirs:
+                os.makedirs(identifier)
+                path = os.path.join(identifier, path)
+
+            writer_templates.append((barcode, path))
+
+        # Special case: unmatched barcodes
+        writer_templates.append((None, self.unmatched_name))
+
+        for barcode, path in writer_templates:
+            queue = multiprocessing.Queue()
+            writer = SequenceWriter(queue, path, self.output_format)
+
+            # Create a process to write output records
+            process = multiprocessing.Process(target=writer.write)
+            process.start()
+            self._output_files[barcode] = queue, writer, process
+
+    def close(self):
+        """
+        Close all the output files
+        """
+        for queue, writer, process in self._output_files.values():
+            queue.put(None)
+            process.join()
+
+        self._output_files = {}
+
+    def run(self, sequences):
+        """
+        Iterates over sequences, writing them to the file associated with their
+        barcode.
+
+        Any sequences which cannot be matched are written to a file named after
+        unmatched_name
+        """
+        counter = collections.Counter()
+        for sequence in sequences:
+            seq_str = str(sequence.seq)[self.barcode_start:]
+            m = self.barcode_re.match(seq_str)
+            if m:
+                barcode = m.group(1)
+                counter[barcode] += 1
+                queue = self._output_files.get(barcode,
+                                               self._output_files[None])[0]
+            else:
+                queue = self._output_files[None][0]
+
+            # There's a problem pickling BioPython _RestrictedDict
+            # instances. Here's a hack to try to work around:
+            # Convert the internal SeqRecord._per_letter_annotations
+            # to a plain old Python dict.
+            sequence._per_letter_annotations = sequence.letter_annotations.copy()
+
+            queue.put(sequence)
+
+        logging.info("%d sequences", sum(counter.values()))
+        logging.info("Most common: %s" % '\n'.join(
+                     ': '.join(map(str, i)) for i in counter.most_common(30)))
 
 
 def build_parser(subparsers):
     """
     Adds description, command line options to parser
     """
-    parser = subparsers.add_parser('split', help="Split .sff.txt by tag")
-    parser.epilog = __doc__
-    parser.description = "sff.txt splitter"
-    parser.formatter_class = argparse.RawDescriptionHelpFormatter
+    logging.basicConfig(level=logging.INFO)
+    parser = subparsers.add_parser('split', help="Split an .sff")
 
-    # Required arguments
-    parser.add_argument('barcode_file', metavar='BARCODE_FILE',
-            type=argparse.FileType('r'),
-            help='Path to barcode file with barcode_id,barcode_seq pairs')
-    parser.add_argument('primer', metavar='PRIMER',
-            help='Regular expression identifying the primer used')
-
-    # Optional arguments
-    parser.add_argument('--sff-file', metavar='SFF_TXT', default=sys.stdin,
-            type=argparse.FileType('r'),
-            help='SFF file. Default: stdin')
-    parser.add_argument('--output-directory', metavar='DIR', default='.',
-            help='Output directory for split files (default: %(default)s)')
-    parser.add_argument('--output-format', metavar='FORMAT',
-            default='anoise_raw', choices=WRITERS.keys(),
-            help="Output format (choices: [%(choices)s], default: %(default)s)")
-    parser.add_argument('--unmatched-name', default='unmatched',
-            help='Name for file containing unmatched records. '
-                 'Default: %(default)s)')
+    parser.add_argument("primer", help="""Sequence primer used,
+            as regular expression""")
+    parser.add_argument("barcode_file", type=argparse.FileType('r'),
+            help="""Path to barcode file with barcode_id,barcode_seq pairs""")
+    parser.add_argument("input_file", metavar="SFF",
+            type=argparse.FileType('rb'),
+            help="""Path to input SFF (use - for stdin)""")
+    parser.add_argument("--make-dirs", action="store_true", default=False,
+            help="Make a subdirectory for each output file")
+    parser.add_argument('--unmatched-name',
+            help="""Name for file with unmatched sequences [default:
+            %(default)s]""", default="unmatched.sff")
 
     return parser
 
-def _makedirs(d):
-    """
-    Make all directories to leaf dir ``d``
-    """
-    try:
-        os.makedirs(d)
-    except OSError, e:
-        if not e.errno == errno.EEXIST:
-            raise e
 
-
-def _load_barcodes(fp):
-    """
-    Read barcodes from fp
-
-    Raises a ValueError on duplicate key *or* value.
-
-    fp should contain (at least) sequence_identifier,barcode_sequence
-    pairs.
-    """
-    reader = csv.reader(fp)
-    values = set()
-    d = {}
-    for line in reader:
-        k, v = line[1], line[0]
-        if k in d:
-            raise ValueError("Duplicate barcode: {0}".format(k))
-        if v in values:
-            raise ValueError("Duplicate value: {0}".format(v))
-        d[k] = v
-        values.add(v)
-    return d
-
-
-def _close_all(files):
-    """
-    Closes an iterable of files, aggregating any exceptions
-    """
-    exceptions = []
-    for f in files:
-        try:
-            f.close()
-        except Exception, e:
-            exceptions.append(e)
-
-    if exceptions:
-        raise IOError("Could not close {0} files: {1}".format(
-            len(exceptions), exceptions))
-
-
-class SFFRunSplitter(object):
-    """
-    Splits flows based on the initial sequence contained in the flowgram
-    """
-
-    def __init__(self, barcode_map, primer, dest_dir, unmatched_dest,
-                 writer_cls):
-        """
-        Initialize a new instance
-
-        :param map barcode_map: map from sequence barcode to name
-        :param str primer: Primer sequence
-        :param str dest_dir: destination directory for output
-        :param str unmatched_dest: name of file for all input
-          sequences not matching any barcodes.
-        :param func writer: Function to use to format records. Passed a
-          single argument as input - the record
-        """
-        self.barcode_map = barcode_map
-        self.primer = primer
-        self.dest_dir = dest_dir
-        self.unmatched_dest = unmatched_dest
-        self.writer_cls = writer_cls
-
-        # Compile barcode matching Regex
-        min_barcode_length = min(len(k) for k in self.barcode_map)
-        max_barcode_length = max(len(k) for k in self.barcode_map)
-        self._barcode_re = re.compile(r'^{0}(\w{{{1},{2}}}){3}'.format(
-            sff.READ_BEGIN, min_barcode_length, max_barcode_length, primer),
-                                      re.IGNORECASE)
-        _makedirs(dest_dir)
-        self._handles = None
-
-    def open(self):
-        """
-        Opens file handles for each barcode, in preparation for writing.
-        """
-        if self._handles:
-            raise IOError("Already initialized with {0} handles".format(
-                     len(self._handles)))
-        self._handles = {}
-
-        for barcode, name in self.barcode_map.items():
-            fname = name + '.raw'
-            outpath = os.path.join(self.dest_dir, fname)
-            fp = open(outpath, 'w')
-            self._handles[barcode] = self.writer_cls(fp, barcode)
-
-        # Create a default handle
-        default_outpath = os.path.join(self.dest_dir, self.unmatched_dest)
-        fp = open(default_outpath + '.raw', 'w')
-        self._handles[None] = self.writer_cls(fp, 'Unknown')
-
-    def close(self):
-        """
-        Closes all open file handles on this instance
-        """
-        if self._handles is not None:
-            _close_all(self._handles.values())
-
-    def _handle_record(self, record):
-        """
-        Identifies the barcode in the record, writes the record
-        to the appropriate outfile, and returns the barcode
-        """
-        bases = record.bases_from_flows()
-        m = self._barcode_re.match(bases)
-        barcode = m.group(1) if m else None
-
-        writer = self._handles.get(barcode, self._handles[None])
-        writer.write(record)
-
-        return barcode
-
-    def split(self, iterable):
-        """
-        Takes an iterable generating ``Bio.SeqRecord.SeqRecord`` objects
-        writes them to a set of output files.
-
-        returns a dictionary of mapping barcode -> # of reads
-        """
-        counts = collections.defaultdict(int)
-        unmatched_counts = collections.defaultdict(int)
-
-        for record in iterable:
-            barcode = self._handle_record(record)
-            counts[barcode] += 1
-
-        if barcode in self._handles:
-            counts[barcode] += 1
-        else:
-            unmatched_counts[barcode] += 1
-
-        return counts
-
-
-def main(parsed_args):
+def main(parsed):
     """
     Command-line functionality
 
@@ -215,29 +203,15 @@ def main(parsed_args):
     * read barcodes
     * run
     """
-    writer = WRITERS[parsed_args.output_format]
+    with parsed.barcode_file:
+        barcodes = load_barcodes(parsed.barcode_file)
 
-    # Split barcodes
-    with parsed_args.barcode_file:
-        barcodes = _load_barcodes(parsed_args.barcode_file)
-
-    splitter = SFFRunSplitter(barcodes, parsed_args.primer,
-                              parsed_args.output_directory,
-                              parsed_args.unmatched_name, writer)
-
-    # Run
-    with contextlib.closing(splitter):
-        splitter.open()
-        with parsed_args.sff_file:
-            reader = SeqIO.parse(parsed_args.sff_file, 'sff')
-            result = splitter.split(reader)
-
-    # Special treatment for unmatched records
-    unmatched = result[None]
-    del result[None]
-
-    items = sorted(result.items())
-    for k, v in items:
-        print 'Barcode {0}: {1:5d} records'.format(k, v)
-
-    print 'Unmatched:', unmatched, 'records'
+    with parsed.input_file:
+        sequences = SeqIO.parse(parsed.input_file, 'sff')
+        splitter = SequenceSplitter(parsed.primer, barcodes,
+                                    parsed.make_dirs, parsed.unmatched_name)
+        try:
+            splitter.open()
+            splitter.run(sequences)
+        finally:
+            splitter.close()

@@ -1,14 +1,11 @@
-import os.path
-import shutil
-import tempfile
 import unittest
 
-from anoisetools import anoiseio
 from anoisetools.scripts import split
 
 def _line_iterator(s):
     return iter(s.splitlines())
 
+@unittest.skip("To be re-written")
 class ReadBarcodeTestCase(unittest.TestCase):
 
     def test_basic(self):
@@ -44,76 +41,3 @@ Barcode2,ACTGAA,Data from patient Y"""
         s = "Barcode1,ACGTGA\nBarcode1,ACGTGG"
         i = _line_iterator(s)
         self.assertRaises(ValueError, split._load_barcodes, i)
-
-
-class SFFRunSplitterTestCase(unittest.TestCase):
-
-    def setUp(self):
-        # Make an output dir for the output
-        self.output_dir = tempfile.mkdtemp(prefix='tmp_anoisetest')
-        self.barcodes = {'AAAA': 'A', 'CCCC': 'B'}
-        self.primer = 'GGGGG[GC]GG'
-        self.unmatched_dest = 'unmatched'
-        self.instance = split.SFFRunSplitter(self.barcodes, self.primer,
-                                             self.output_dir,
-                                             self.unmatched_dest,
-                                             anoiseio.AnoiseRawWriter)
-
-    def tearDown(self):
-        self.instance.close()
-        shutil.rmtree(self.output_dir)
-
-    def test_barcode_re(self):
-        instance = self.instance
-        barcode_re = instance._barcode_re
-
-        test = 'TCAGAAAAGGGGGGGGACGC'
-        m = barcode_re.match(test)
-        self.assertTrue(m is not None, '{0} must match'.format(test))
-        self.assertEquals('AAAA', m.group(1),
-                          msg='Barcode group must be captured')
-
-        test = 'TGACAAAAGGGCGGGG'
-        self.assertTrue(barcode_re.match(test) is None,
-                        msg='Invalid initial sequence must not match')
-
-    def test_open_files_present(self):
-        instance = self.instance
-        def check_name(key, fname):
-            self.assertTrue(key in instance._handles, msg='Missing key: {0}'.format(key))
-            path = instance._handles[key]._fp.name
-            self.assertEquals(fname, os.path.basename(path))
-        instance.open()
-        self.assertEquals(3, len(instance._handles))
-        check_name(None, 'unmatched.raw')
-        check_name('AAAA', 'A.raw')
-        check_name('CCCC', 'B.raw')
-
-    def test_open_files_open(self):
-        # Make sure all files are open
-        instance = self.instance
-        instance.open()
-        for f in instance._handles.values():
-            self.assertTrue(not f._fp.closed, msg='Closed: {0}'.format(f))
-
-    def test_open_files_close(self):
-        instance = self.instance
-        instance.open()
-        instance.close()
-        for f in instance._handles.values():
-            self.assertTrue(f._fp.closed, msg='Still open: {0}'.format(f))
-
-    def _test_write_dest(self, barcode, identifier):
-        handle = self.instance._handles[barcode]
-        current_pos = handle.tell()
-        # Rewind
-        handle.seek(0)
-        contents = handle.read()
-        # Resume
-        handle.seek(current_pos)
-        self.assertTrue(identifier in contents,
-                        msg='Expected to find ' + identifier)
-
-    def test_correct_write(self):
-        # TODO: Write
-        pass
