@@ -8,6 +8,6 @@ setup(name = 'anoisetools',
       author = 'Connor McCoy',
       author_email = 'cmccoy@fhcrc.org',
       packages = ['anoisetools', 'anoisetools.test', 'anoisetools.scripts'],
-      requires = ['Python (>= 2.7)'],
+      requires = ['Python (>= 2.7)', 'biopython (>=1.56)'],
       scripts = glob.glob('scripts/*'),
       )

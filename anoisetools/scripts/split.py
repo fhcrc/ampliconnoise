@@ -1,7 +1,7 @@
 """
 Given the input:
 
-  * A flower-converted Standard Flowgram File
+  * A Standard Flowgram File
   * A file containing mappings from DNA sequence barcodes to a meaningful
     identifier
   * A regular expression to identify the primer sequence used
@@ -22,21 +22,12 @@ import os.path
 import re
 import sys
 
+from Bio import SeqIO
+
 from anoisetools import sff, anoiseio
 
-
-class _FlowerWriter(object):
-    def __init__(self, fp, *args):
-        self._fp = fp
-
-    def write(self, record):
-        print >> self._fp, str(record)
-
-    def close(self):
-        self._fp.close()
-
 # Output formatters - each takes a record, returns a string to write
-WRITERS = {'flower': _FlowerWriter, 'anoise_raw': anoiseio.AnoiseRawWriter}
+WRITERS = {'anoise_raw': anoiseio.AnoiseRawWriter}
 
 
 def build_parser(subparsers):
@@ -58,7 +49,7 @@ def build_parser(subparsers):
     # Optional arguments
     parser.add_argument('--sff-file', metavar='SFF_TXT', default=sys.stdin,
             type=argparse.FileType('r'),
-            help='Flower-decoded SFF text file. Default: stdin')
+            help='SFF file. Default: stdin')
     parser.add_argument('--output-directory', metavar='DIR', default='.',
             help='Output directory for split files (default: %(default)s)')
     parser.add_argument('--output-format', metavar='FORMAT',
@@ -196,8 +187,9 @@ class SFFRunSplitter(object):
 
     def split(self, iterable):
         """
-        Takes an iterable generating :ref:`ampliconnoise.sff.SFFRead`s,
-        writes them to a set of output files
+        Takes an iterable generating ``Bio.SeqRecord.SeqRecord`` objects
+        writes them to a set of output files.
+
         returns a dictionary of mapping barcode -> # of reads
         """
         counts = collections.defaultdict(int)
@@ -229,14 +221,15 @@ def main(parsed_args):
     with parsed_args.barcode_file:
         barcodes = _load_barcodes(parsed_args.barcode_file)
 
-    splitter = SFFRunSplitter(barcodes, parsed_args.primer, parsed_args.output_directory,
+    splitter = SFFRunSplitter(barcodes, parsed_args.primer,
+                              parsed_args.output_directory,
                               parsed_args.unmatched_name, writer)
 
     # Run
     with contextlib.closing(splitter):
         splitter.open()
         with parsed_args.sff_file:
-            reader = sff.parse_flower(parsed_args.sff_file)
+            reader = SeqIO.parse(parsed_args.sff_file, 'sff')
             result = splitter.split(reader)
 
     # Special treatment for unmatched records

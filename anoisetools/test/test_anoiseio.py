@@ -1,6 +1,10 @@
 
 import unittest
 
+from Bio.Alphabet import generic_dna
+from Bio.Seq import Seq
+from Bio.SeqRecord import SeqRecord
+
 from anoisetools import anoiseio, sff
 
 
@@ -29,15 +33,19 @@ class SplitKeysReaderTestCase(unittest.TestCase):
         records = [i for i in self.reader]
 
         record0 = records[0]
-        self.assertEquals('GYUL5KN01A46DL', record0.identifier)
-        self.assertEquals([0.99, .02, 1.09, .07], record0.flows)
+        self.assertEquals('GYUL5KN01A46DL', record0.id)
+        self.assertEquals([99, 2, 109, 7],
+                          record0.annotations['flow_values'])
 
 class AnoiseRecordConverterTestCase(unittest.TestCase):
 
     def setUp(self):
-        self.record = sff.SFFRead('FTWCYXX01BTPDQ')
-        self.record.clip = [0, 14]
-        self.record.flows = [1.04, 0.01, 1.02, 0.07, 0.05, 0.97, 0.06, 2.00, 0.96, 1.09, 0.98, 0.08, 0.02, 1.18]
+        flows = [104, 1, 102, 7, 5, 97, 6, 200, 96, 109, 98, 8, 2, 118]
+        bases = sff.flow_to_seq(flows)
+        sequence = Seq(bases, generic_dna)
+        self.record = SeqRecord(sequence, id='FTWCYXX01BTPDQ')
+        self.record.annotations['clip_qual_right'] = 14
+        self.record.annotations['flow_values'] = flows
 
     def test_to_anoise_raw(self):
         record = self.record
