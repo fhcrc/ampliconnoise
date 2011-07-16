@@ -83,6 +83,10 @@ class AnoiseRawWriter(object):
         print >> self._temp, _record_to_anoise_raw(record)
         self.count += 1
 
+    def write_records(self, records):
+        for record in records:
+            self.write(record)
+
     def _copy_to_output(self):
         """
         Add a header to _fp, writes all the records in _temp
