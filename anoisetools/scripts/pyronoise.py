@@ -9,6 +9,9 @@ import shutil
 import subprocess
 import tempfile
 
+from anoisetools.scripts import clean, sff2raw
+from anoisetools import anoiseio
+
 
 def build_parser(subparsers):
     logging.basicConfig(level=logging.INFO)
@@ -42,6 +45,8 @@ def build_parser(subparsers):
     clean_group.add_argument('--max-empty', default=0, type=int,
             help="""Maximum empty flowgrams to accept before truncation
             [default: %(default)s]""")
+    clean_group.add_argument('--primer', default='.',
+            help="Regular expression to identify primer")
 
     return parser
 
@@ -56,117 +61,141 @@ def main(arguments):
 
     subprocess.check_call = check_call
 
-    tmp_dir = create_temp_dir(arguments.temp_dir)
-    logging.info("Working in temporary directory: %s", tmp_dir)
-
     if not arguments.stub:
-        arguments.stub = os.path.basename(os.path.splitext(arguments.stub)[0])
+        arguments.stub = os.path.basename(os.path.splitext(arguments.sff_file)[0])
 
-    clean_dat = os.path.join(tmp_dir, arguments.stub + '.dat')
-    logging.info("Writing clean flows to %s", clean_dat)
-    clean_sff(arguments.sff_file, arguments.clean_params, clean_dat)
+    pnoise_stub = arguments.stub + '-pnoise'
+    targets = [pnoise_stub, pnoise_stub + '_cd.fa']
+    runner = NoiseRunner(targets, temp_base=arguments.temp_dir,
+        mpi_flags=arguments.mpi_args)
 
-    pnoise_result = run_pyronoise(clean_dat, arguments.p_cluster_size,
-            arguments.p_initial_cutoff, arguments.np, arguments.nodes_file,
-            arguments.stub, cwd=tmp_dir)
-    for v in pnoise_result.values():
-        logging.info(v)
-        shutil.move(v, os.getcwd())
+    with runner:
+        # Clean
+        logging.info("Extracting clean flows")
+        raw_file = runner.path_join(arguments.stub + '.raw')
+        with open(raw_file, 'w') as fp:
+            sff2raw.sff_to_raw(arguments.sff_file, fp)
+        clean_dat = runner.path_join(arguments.stub + '.dat')
+        with open(raw_file) as raw_fp:
+            reader = anoiseio.AnoiseRawReader(raw_fp)
+            with open(runner.path_join(arguments.stub + '.fa'), 'w') as fa_fp:
+                clean.invoke(reader, fa_fp, clean_dat, arguments.primer,
+                        arguments.min_flows, arguments.max_flows,
+                        arguments.max_empty)
 
-    pnoise_result = {k:os.path.abspath(os.path.basename(v))
-                     for k, v in pnoise_result.items()}
+        logging.info("Running PyroNoise")
+        run_pyronoise(runner, clean_dat, arguments.p_cluster_size,
+                arguments.p_initial_cutoff, arguments.stub)
 
-    # Clear
-    logging.info("Removing %s", tmp_dir)
-    shutil.rmtree(tmp_dir)
 
-    tmp_dir = create_temp_dir()
+    #snoise_results = run_seqnoise(pnoise_result['denoised_sequences'],
+            #pnoise_result['mapping'], arguments.s_cluster_size, arguments.stub
+            #+ '-snoise', arguments.np, arguments.nodes_file, tmp_dir)
 
-    snoise_results = run_seqnoise(pnoise_result['denoised_sequences'],
-            pnoise_result['mapping'], arguments.s_cluster_size, arguments.stub
-            + '-snoise', arguments.np, arguments.nodes_file, tmp_dir)
+    #for v in snoise_results.values():
+        #logging.info(v)
+        #shutil.move(v, os.getcwd())
 
-    for v in snoise_results.values():
-        logging.info(v)
-        shutil.move(v, os.getcwd())
+    #logging.info("removing %s", tmp_dir)
+    #shutil.rmtree(tmp_dir)
 
-    logging.info("removing %s", tmp_dir)
-    shutil.rmtree(tmp_dir)
+class NoiseRunner(object):
 
-def create_temp_dir(temp_dir=None):
-    return tempfile.mkdtemp(prefix='anoise', dir=temp_dir)
+    def __init__(self, target_files, target_dir=os.getcwd(), temp_base=None,
+            mpi_cmd='mpirun', mpi_flags=None, cleanup=True):
+        self.mpi_cmd = mpi_cmd
+        self.mpi_flags = mpi_flags or []
+        self.temp_base = temp_base
+        self.target_files = target_files
+        self.target_dir = target_dir
+        self.temp_dir = None
+        self.cleanup = cleanup
 
-def mpirun(command, np=1, nodes_file=None):
-    cmd = ['mpirun', '-np', str(np)]
-    if nodes_file:
-        cmd.extend(['-machinefile', nodes_file])
-    cmd.append(command)
-    return cmd
+    def _mpi_command(self, cmd):
+        return [self.mpi_cmd] + self.mpi_flags + cmd
 
-def clean_sff(sff_path, clean_params, outfile):
-    bn = os.path.splitext(outfile)[0]
-    rawpath = bn + '.raw'
-    cmd = ['sff2raw', os.path.basename(sff_path), sff_path, rawpath]
-    subprocess.check_call(cmd)
-    cmd = ['anoise', 'clean', '--input', rawpath, '.', bn]
-    cmd.extend(clean_params)
-    subprocess.check_call(cmd)
+    def path_join(self, basename):
+        return os.path.join(self.temp_dir, basename)
 
-def run_pyronoise(dat_path, p_cluster_size, p_initial_cutoff,
-        np, nodes_file, output_stub, cwd=None):
+    def run(self, command, mpi=True, **kwargs):
+        if not (self.temp_dir and os.path.isdir(self.temp_dir)):
+            raise ValueError("Missing temporary directory: "
+                    "{0}".format(self.temp_dir))
 
-    # PyroDist
-    pyrodist_cmd = mpirun('PyroDist', np, nodes_file)
-    pyrodist_cmd.extend(['-in', dat_path, '-out', output_stub])
-    subprocess.check_call(pyrodist_cmd, cwd=cwd)
+        if mpi:
+            command = self._mpi_command(command)
 
-    # FCluster
-    fcluster_cmd = mpirun('FCluster', np, nodes_file)
-    fcluster_cmd.extend(['-in', output_stub + '.fdist',
-                         '-out', output_stub + '-initial'])
-    subprocess.check_call(fcluster_cmd, cwd=cwd)
+        # Convert args to strings
+        command = map(str, command)
 
-    # PyroNoise
+        logging.info("Running: %s", " ".join(command))
+        subprocess.check_call(command, cwd=self.temp_dir, **kwargs)
+
+    def _setup(self):
+        # Generate a temporary directory
+        self.temp_dir = tempfile.mkdtemp(prefix='noise-', dir=self.temp_dir)
+        logging.info("Working in %s", self.temp_dir)
+
+    def _fetch_targets(self):
+        for f in self.target_files:
+            logging.info("Moving %s to %s", f, self.target_dir)
+            shutil.move(self.path_join(f), self.target_dir)
+
+    def _cleanup(self):
+        logging.info("Cleaning up")
+        # Move all the results in
+        if self.temp_dir:
+            if self.cleanup:
+                logging.info("Removing %s", self.temp_dir)
+                shutil.rmtree(self.temp_dir)
+            else:
+                logging.info("Keeping %s", self.temp_dir)
+        self.temp_dir = None
+
+    def __enter__(self):
+        self._setup()
+        return self
+
+    def __exit__(self, err_type, err_value, err_traceback):
+        try:
+            self._fetch_targets()
+        except Exception, e:
+            logging.exception("Error fetching targets")
+        finally:
+            self._cleanup()
+        return False
+
+
+def run_pyronoise(runner, dat_path, p_cluster_size, p_initial_cutoff,
+        output_stub):
+
     pnoise_stub = output_stub + '-pnoise'
-    pyronoise_cmd = mpirun('PyroNoise', np, nodes_file)
-    pyronoise_cmd.extend(['-din', dat_path, '-out', pnoise_stub,
+    runner.run(['PyroDist', '-in', dat_path, '-out', output_stub])
+    runner.run(['FCluster', '-in', output_stub + '.fdist',
+        '-out', output_stub + '-initial'])
+    runner.run(['PyroNoise', '-din', dat_path, '-out', pnoise_stub,
             '-lin', output_stub + '-initial.list', '-s', p_cluster_size,
             '-c', p_initial_cutoff])
-    subprocess.check_call(map(str, pyronoise_cmd), cwd=cwd)
 
-    # Return output needed by results
-    return {'sequence_map': os.path.join(cwd, pnoise_stub),
-            'denoised_sequences': os.path.join(cwd, pnoise_stub + '_cd.fa'),
-            'mapping': os.path.join(cwd, pnoise_stub + '.mapping')}
 
-def run_seqnoise(fasta_file, pnoise_mapping, s_cluster_size, stub,
-        np, nodes_file, cwd=None):
+def run_seqnoise(runner, fasta_file, pnoise_mapping, s_cluster_size, stub):
 
     # SeqDist
-    seqdist_cmd = mpirun('SeqDist', np, nodes_file)
-    seqdist_out = os.path.join(cwd or '.', stub + '.seqdist')
-    seqdist_cmd.extend(['-in', fasta_file])
-    with open(seqdist_out, 'w') as fp:
-        subprocess.check_call(seqdist_cmd, stdout=fp, cwd=cwd)
+    seqdist_out = runner.path_join(stub + '.seqdist')
+    with open(seqdist_out) as fp:
+        runner.run(['SeqDist', '-in', fasta_file], stdout=fp)
 
-    # FCluster
-    fcluster_cmd = mpirun('FCluster', np, nodes_file)
-    fcluster_cmd.extend(['-in', seqdist_out, '-out', stub])
-    subprocess.check_call(fcluster_cmd, cwd=cwd)
+    runner.run(['FCluster', '-in', seqdist_out, '-out', stub])
     fcluster_list = stub + '.list'
 
     # SeqNoise
-    seqnoise_cmd = mpirun('SeqNoise', np, nodes_file)
-    seqnoise_cmd.extend(['-in', fasta_file,
-                         '-din', seqdist_out,
-                         '-out', stub,
-                         '-lin', fcluster_list,
-                         '-min', pnoise_mapping,
-                         '-s', s_cluster_size])
-    subprocess.check_call(map(str, seqnoise_cmd), cwd=cwd)
-    return {"sequence_map": os.path.join(cwd, stub),
-            "denoised_sequences": os.path.join(cwd, stub + '_cd.fa'),
-            "mapping_file": os.path.join(cwd, stub + ".mapping")}
+    runner.run(['SeqNoise',
+                '-in', fasta_file,
+                '-din', seqdist_out,
+                '-out', stub,
+                '-lin', fcluster_list,
+                '-min', pnoise_mapping,
+                '-s', s_cluster_size])
 
 if __name__ == '__main__':
     main()

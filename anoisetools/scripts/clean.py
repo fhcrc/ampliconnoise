@@ -150,19 +150,21 @@ class FlowgramFilter(object):
 
     def filter_records(self, records):
         for record in records:
-            record.flows = self.filter_record(record.flows)
-            trimmed_reading = sff.flow_to_seq(record.flows)
+            flows = record.annotations['flow_values'][:record.annotations['clip_qual_right']]
+            flows = [float(i) / 100 for i in flows]
+            flows = self.filter_record(flows)
+            trimmed_reading = sff.flow_to_seq(flows)
 
             m = self.primer_re.match(trimmed_reading)
-            if (self.min_flows is None or len(record.flows) >= self.min_flows) and m:
+            if (self.min_flows is None or len(flows) >= self.min_flows) and m:
                 sequence = m.group(1)
 
                 # Truncate the flow result to a maximum length
                 # Note that the FASTA result is unchanged
-                flow_result = record.flows[:self.max_flows]
+                flow_result = flows[:self.max_flows]
 
                 self.passed += 1
-                yield (record.identifier, sequence, flow_result)
+                yield (record.id, sequence, flow_result)
             else:
                 self.failed += 1
 

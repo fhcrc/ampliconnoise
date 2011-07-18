@@ -22,12 +22,12 @@ def build_parser(subparsers):
     return parser
 
 
-def sff_to_raw(infile, outfile):
+def sff_to_raw(infile, outfile, identifier=None):
     """
     Reads raw records from infile, converts to fasta, writes to outfile
     """
     sequences = SeqIO.parse(infile, 'sff')
-    writer = anoiseio.AnoiseRawWriter(outfile)
+    writer = anoiseio.AnoiseRawWriter(outfile, identifier or '454Reads')
     try:
         writer.write_records(sequences)
     finally:
