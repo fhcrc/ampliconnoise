@@ -57,8 +57,10 @@ def main(arguments):
 
     pnoise_stub = arguments.stub + '-pnoise'
     targets = [pnoise_stub, pnoise_stub + '_cd.fa']
+
+
     runner = NoiseRunner(targets, temp_base=arguments.temp_dir,
-        mpi_flags=arguments.mpi_args)
+        mpi_flags=arguments.mpi_args, write_stdout=arguments.verbose)
 
     with runner:
         # Clean
@@ -87,7 +89,7 @@ def main(arguments):
 class NoiseRunner(object):
 
     def __init__(self, target_files, target_dir=os.getcwd(), temp_base=None,
-            mpi_cmd='mpirun', mpi_flags=None, cleanup=True):
+            mpi_cmd='mpirun', mpi_flags=None, cleanup=True, write_stdout=True):
         self.mpi_cmd = mpi_cmd
         self.mpi_flags = mpi_flags or []
         self.temp_base = temp_base
@@ -95,6 +97,7 @@ class NoiseRunner(object):
         self.target_dir = target_dir
         self.temp_dir = None
         self.cleanup = cleanup
+        self.write_stdout = write_stdout
 
     def _mpi_command(self, cmd):
         return [self.mpi_cmd] + self.mpi_flags + cmd
@@ -107,6 +110,7 @@ class NoiseRunner(object):
         return os.path.join(self.temp_dir, fname)
 
     def run(self, command, mpi=True, **kwargs):
+
         if not (self.temp_dir and os.path.isdir(self.temp_dir)):
             raise ValueError("Missing temporary directory: "
                     "{0}".format(self.temp_dir))
@@ -116,6 +120,10 @@ class NoiseRunner(object):
 
         # Convert args to strings
         command = map(str, command)
+
+        # Handle standard output
+        if not self.write_stdout and not 'stdout' in kwargs:
+            kwargs['stdout'] = open(os.devnull, 'w')
 
         logging.info("Running: %s", " ".join(command))
         subprocess.check_call(command, cwd=self.temp_dir, **kwargs)
