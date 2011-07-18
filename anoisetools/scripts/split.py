@@ -176,7 +176,6 @@ def build_parser(subparsers):
     """
     Adds description, command line options to parser
     """
-    logging.basicConfig(level=logging.INFO)
     parser = subparsers.add_parser('split', help="Split an .sff")
 
     parser.add_argument("primer", help="""Sequence primer used,

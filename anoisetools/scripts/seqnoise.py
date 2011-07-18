@@ -10,7 +10,6 @@ from anoisetools.scripts.pyronoise import NoiseRunner
 
 
 def build_parser(subparsers):
-    logging.basicConfig(level=logging.INFO)
     parser = subparsers.add_parser("seqnoise", help="Run SeqNoise")
 
     pnoise_opts = parser.add_argument_group("SeqNoise Options")
@@ -41,14 +40,14 @@ def main(arguments):
     if not arguments.stub:
         arguments.stub = os.path.basename(
                 os.path.splitext(arguments.fasta_file)[0])
-    if arguments.stub.endswith('-pnoise'):
-        arguments.stub = arguments.stub[:-7]
+    if arguments.stub.endswith('-pnoise_cd'):
+        arguments.stub = arguments.stub[:-10]
 
     snoise_stub = arguments.stub + '-snoise'
     targets = [snoise_stub, snoise_stub + '_cd.fa', snoise_stub + '.mapping']
 
     runner = NoiseRunner(targets, temp_base=arguments.temp_dir,
-        mpi_flags=arguments.mpi_args, write_stdout=arguments.verbose)
+        mpi_flags=arguments.mpi_args)
 
     with runner:
         logging.info("Running SeqNoise")

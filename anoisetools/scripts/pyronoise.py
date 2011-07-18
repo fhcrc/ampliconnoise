@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-import collections
 import logging
 import os
 import os.path
@@ -16,7 +15,6 @@ from anoisetools import anoiseio
 
 
 def build_parser(subparsers):
-    logging.basicConfig(level=logging.INFO)
     parser = subparsers.add_parser("pyronoise", help="Run PyroNoise")
 
     pnoise_opts = parser.add_argument_group("PyroNoise Options")
@@ -62,7 +60,7 @@ def main(arguments):
 
 
     runner = NoiseRunner(targets, temp_base=arguments.temp_dir,
-        mpi_flags=arguments.mpi_args, write_stdout=arguments.verbose)
+        mpi_flags=arguments.mpi_args)
 
     with runner:
         # Clean
@@ -78,7 +76,7 @@ def main(arguments):
                         arguments.min_flows, arguments.max_flows,
                         arguments.max_empty)
 
-        logging.info("Running PyroNoise")
+        logging.info("Starting PyroNoise")
         run_pyronoise(runner, clean_dat, arguments.sigma,
                 arguments.cutoff, arguments.stub)
 
@@ -88,24 +86,10 @@ def main(arguments):
             #+ '-snoise', arguments.np, arguments.nodes_file, tmp_dir)
 
 
-class LineBuffer(object):
-    def __init__(self, size=25):
-        self.buffer = collections.deque(maxlen=size)
-
-    def write(self, text):
-        self.buffer.extend(text.splitlines())
-
-    def writelines(self, lines):
-        self.buffer.extend(lines)
-
-    def getvalue(self):
-        return '\n'.join(self.buffer)
-
-
 class NoiseRunner(object):
 
     def __init__(self, target_files, target_dir=os.getcwd(), temp_base=None,
-            mpi_cmd='mpirun', mpi_flags=None, cleanup=True, write_stdout=True):
+            mpi_cmd='mpirun', mpi_flags=None, cleanup=True):
         self.mpi_cmd = mpi_cmd
         self.mpi_flags = mpi_flags or []
         self.temp_base = temp_base
@@ -113,7 +97,6 @@ class NoiseRunner(object):
         self.target_dir = target_dir
         self.temp_dir = None
         self.cleanup = cleanup
-        self.write_stdout = write_stdout
 
     def _mpi_command(self, cmd):
         return [self.mpi_cmd] + self.mpi_flags + cmd
@@ -125,8 +108,8 @@ class NoiseRunner(object):
         """
         return os.path.join(self.temp_dir, fname)
 
-    def run(self, command, mpi=True, suppress_stdout=False,
-            suppress_stderr=False, **kwargs):
+    def run(self, command, mpi=True, suppress_stdout=True,
+            suppress_stderr=True, **kwargs):
         """
         Run the specified command
         """
@@ -138,18 +121,35 @@ class NoiseRunner(object):
         if mpi:
             command = self._mpi_command(command)
 
+        outputs = [i for i in ('stderr', 'stdout') if i not in kwargs]
+        for i in ('stderr', 'stdout'):
+            if not i in kwargs:
+                kwargs[i] = tempfile.SpooledTemporaryFile()
+
         # Convert args to strings
         command = map(str, command)
 
-        # Handle standard output
-        if not self.write_stdout and not 'stdout' in kwargs:
-            kwargs['stdout'] = open(os.devnull, 'w')
-
         logging.info("Running: %s", " ".join(command))
         try:
-            subprocess.check_call(command, cwd=self.temp_dir, **kwargs)
-        except subprocess.CalledProcessError:
-            pass
+            p = subprocess.Popen(command, cwd=self.temp_dir, **kwargs)
+            p.wait()
+            if p.returncode:
+                raise subprocess.CalledProcessError("Error", p.returncode)
+        except subprocess.CalledProcessError, e:
+            if 'stderr' in outputs:
+                kwargs['stderr'].seek(0)
+                stderr = kwargs['stderr'].read()
+            else:
+                stderr = ''
+            if 'stdout' in outputs:
+                kwargs['stdout'].seek(0)
+                stdout = kwargs['stdout'].read()
+            else:
+                stdout = ''
+
+            logging.error("Error running '%s': returned with %s.\nstdout:\n%s\nstderr:%s",
+                    ' '.join(command), p.returncode, stdout, stderr)
+            raise SystemExit(1)
 
     def _setup(self):
         # Generate a temporary directory
@@ -188,7 +188,6 @@ class NoiseRunner(object):
 
 
 def run_pyronoise(runner, dat_path, sigma, cutoff, output_stub):
-
     pnoise_stub = output_stub + '-pnoise'
     runner.run(['PyroDist', '-in', dat_path, '-out', output_stub])
     runner.run(['FCluster', '-in', output_stub + '.fdist',
