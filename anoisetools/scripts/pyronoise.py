@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import collections
 import logging
 import os
 import os.path
@@ -13,15 +14,16 @@ from anoisetools.scripts import clean, sff2raw
 from anoisetools import anoiseio
 
 
+
 def build_parser(subparsers):
     logging.basicConfig(level=logging.INFO)
     parser = subparsers.add_parser("pyronoise", help="Run PyroNoise")
 
     pnoise_opts = parser.add_argument_group("PyroNoise Options")
-    pnoise_opts.add_argument('-s', '--p-cluster-size', type=float,
+    pnoise_opts.add_argument('-s', '--sigma', type=float,
             default=60.0, help="""Initial cluster size (see Quince et al)
             [default: %(default)s]""")
-    pnoise_opts.add_argument('-c', '--p-initial-cutoff', type=float,
+    pnoise_opts.add_argument('-c', '--cutoff', type=float,
             default=0.01, help="""Initial cutoff (see Quince et al) [default:
             %(default)s]""")
 
@@ -56,7 +58,7 @@ def main(arguments):
                 os.path.splitext(arguments.sff_file)[0])
 
     pnoise_stub = arguments.stub + '-pnoise'
-    targets = [pnoise_stub, pnoise_stub + '_cd.fa']
+    targets = [pnoise_stub, pnoise_stub + '_cd.fa', pnoise_stub + '.mapping']
 
 
     runner = NoiseRunner(targets, temp_base=arguments.temp_dir,
@@ -77,13 +79,27 @@ def main(arguments):
                         arguments.max_empty)
 
         logging.info("Running PyroNoise")
-        run_pyronoise(runner, clean_dat, arguments.p_cluster_size,
-                arguments.p_initial_cutoff, arguments.stub)
+        run_pyronoise(runner, clean_dat, arguments.sigma,
+                arguments.cutoff, arguments.stub)
 
 
     #snoise_results = run_seqnoise(pnoise_result['denoised_sequences'],
             #pnoise_result['mapping'], arguments.s_cluster_size, arguments.stub
             #+ '-snoise', arguments.np, arguments.nodes_file, tmp_dir)
+
+
+class LineBuffer(object):
+    def __init__(self, size=25):
+        self.buffer = collections.deque(maxlen=size)
+
+    def write(self, text):
+        self.buffer.extend(text.splitlines())
+
+    def writelines(self, lines):
+        self.buffer.extend(lines)
+
+    def getvalue(self):
+        return '\n'.join(self.buffer)
 
 
 class NoiseRunner(object):
@@ -109,7 +125,11 @@ class NoiseRunner(object):
         """
         return os.path.join(self.temp_dir, fname)
 
-    def run(self, command, mpi=True, **kwargs):
+    def run(self, command, mpi=True, suppress_stdout=False,
+            suppress_stderr=False, **kwargs):
+        """
+        Run the specified command
+        """
 
         if not (self.temp_dir and os.path.isdir(self.temp_dir)):
             raise ValueError("Missing temporary directory: "
@@ -126,7 +146,10 @@ class NoiseRunner(object):
             kwargs['stdout'] = open(os.devnull, 'w')
 
         logging.info("Running: %s", " ".join(command))
-        subprocess.check_call(command, cwd=self.temp_dir, **kwargs)
+        try:
+            subprocess.check_call(command, cwd=self.temp_dir, **kwargs)
+        except subprocess.CalledProcessError:
+            pass
 
     def _setup(self):
         # Generate a temporary directory
@@ -155,7 +178,8 @@ class NoiseRunner(object):
 
     def __exit__(self, err_type, err_value, err_traceback):
         try:
-            self._fetch_targets()
+            if not err_type:
+                self._fetch_targets()
         except Exception, e:
             logging.exception("Error fetching targets")
         finally:
@@ -163,36 +187,13 @@ class NoiseRunner(object):
         return False
 
 
-def run_pyronoise(runner, dat_path, p_cluster_size, p_initial_cutoff,
-        output_stub):
+def run_pyronoise(runner, dat_path, sigma, cutoff, output_stub):
 
     pnoise_stub = output_stub + '-pnoise'
     runner.run(['PyroDist', '-in', dat_path, '-out', output_stub])
     runner.run(['FCluster', '-in', output_stub + '.fdist',
         '-out', output_stub + '-initial'])
     runner.run(['PyroNoise', '-din', dat_path, '-out', pnoise_stub,
-            '-lin', output_stub + '-initial.list', '-s', p_cluster_size,
-            '-c', p_initial_cutoff])
+            '-lin', output_stub + '-initial.list', '-s', sigma,
+            '-c', cutoff])
 
-
-def run_seqnoise(runner, fasta_file, pnoise_mapping, s_cluster_size, stub):
-
-    # SeqDist
-    seqdist_out = runner.path_join(stub + '.seqdist')
-    with open(seqdist_out) as fp:
-        runner.run(['SeqDist', '-in', fasta_file], stdout=fp)
-
-    runner.run(['FCluster', '-in', seqdist_out, '-out', stub])
-    fcluster_list = stub + '.list'
-
-    # SeqNoise
-    runner.run(['SeqNoise',
-                '-in', fasta_file,
-                '-din', seqdist_out,
-                '-out', stub,
-                '-lin', fcluster_list,
-                '-min', pnoise_mapping,
-                '-s', s_cluster_size])
-
-if __name__ == '__main__':
-    main()
