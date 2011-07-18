@@ -51,18 +51,9 @@ def build_parser(subparsers):
     return parser
 
 def main(arguments):
-
-
-    # Override check_call
-    sp_check_call = subprocess.check_call
-    def check_call(cmd, *args, **kwargs):
-        logging.info(' '.join(cmd))
-        sp_check_call(cmd, *args, **kwargs)
-
-    subprocess.check_call = check_call
-
     if not arguments.stub:
-        arguments.stub = os.path.basename(os.path.splitext(arguments.sff_file)[0])
+        arguments.stub = os.path.basename(
+                os.path.splitext(arguments.sff_file)[0])
 
     pnoise_stub = arguments.stub + '-pnoise'
     targets = [pnoise_stub, pnoise_stub + '_cd.fa']
@@ -92,12 +83,6 @@ def main(arguments):
             #pnoise_result['mapping'], arguments.s_cluster_size, arguments.stub
             #+ '-snoise', arguments.np, arguments.nodes_file, tmp_dir)
 
-    #for v in snoise_results.values():
-        #logging.info(v)
-        #shutil.move(v, os.getcwd())
-
-    #logging.info("removing %s", tmp_dir)
-    #shutil.rmtree(tmp_dir)
 
 class NoiseRunner(object):
 
@@ -114,8 +99,12 @@ class NoiseRunner(object):
     def _mpi_command(self, cmd):
         return [self.mpi_cmd] + self.mpi_flags + cmd
 
-    def path_join(self, basename):
-        return os.path.join(self.temp_dir, basename)
+    def path_join(self, fname):
+        """
+        Returns the full path to file identified by fname in the working temp
+        dir.
+        """
+        return os.path.join(self.temp_dir, fname)
 
     def run(self, command, mpi=True, **kwargs):
         if not (self.temp_dir and os.path.isdir(self.temp_dir)):
