@@ -153,7 +153,7 @@ class NoiseRunner(object):
 
     def _setup(self):
         # Generate a temporary directory
-        self.temp_dir = tempfile.mkdtemp(prefix='noise-', dir=self.temp_dir)
+        self.temp_dir = tempfile.mkdtemp(prefix='noise-', dir=self.temp_base)
         logging.info("Working in %s", self.temp_dir)
 
     def _fetch_targets(self):
