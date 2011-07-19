@@ -112,8 +112,12 @@ class SequenceSplitter(object):
         for barcode, identifier in self.barcodes.items():
             path = identifier + '.' + self.output_format
             if self.make_dirs:
-                os.makedirs(identifier)
                 path = os.path.join(identifier, path)
+            try:
+                os.makedirs(os.path.dirname(path))
+            except OSError, e:
+                if e.errno == 17:
+                    pass
 
             writer_templates.append((barcode, path))
 
