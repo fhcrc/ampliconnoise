@@ -587,7 +587,9 @@ void readData(t_Data *ptData, t_Params *ptParams)
   }
 
   ptData->aszID        = (char **) malloc(ptData->nSeq*sizeof(char *));
-  
+  if(nPos > ptData->nMaxLen){
+    ptData->nMaxLen = nPos;
+  }  
   nM = ptData->nMaxLen;
   ptData->acSequences = (char *) malloc(ptData->nSeq*nM*sizeof(char));
   ptData->anLen       = (int *)  malloc(ptData->nSeq*sizeof(int));

@@ -355,7 +355,8 @@ double dist(char cA, char cB)
     nA = 3;
     break;
   default:
-    fprintf(stderr, "Non standard base\n");
+    fprintf(stderr, "Non standard base %c\n", cA);
+    return 0.0;
   }
 
   switch(cB){
@@ -372,7 +373,8 @@ double dist(char cA, char cB)
     nB = 3;
     break;
   default:
-    fprintf(stderr, "Non standard base\n");
+    fprintf(stderr, "Non standard base %c\n", cB);
+    return 0.0;
   }
 
   return adLookUp[nA*N_BASES + nB];
@@ -813,7 +815,9 @@ void readData(t_Data *ptData, t_Params *ptParams)
   }
 
   ptData->aszID        = (char **) malloc(ptData->nSeq*sizeof(char *));
-  
+  if(nPos > ptData->nMaxLen){
+    ptData->nMaxLen = nPos;
+  }
   nM = ptData->nMaxLen;
   ptData->acSequences = (char *) malloc(ptData->nSeq*nM*sizeof(char));
   ptData->anLen       = (int *)  malloc(ptData->nSeq*sizeof(int));
