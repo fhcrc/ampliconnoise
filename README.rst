@@ -4,11 +4,11 @@
 Python package for prepping 454 data for use with `AmpliconNoise`_
 (`Quince et al BMC Bioinformatics 2011`_, `Quince et al Nature Methods 2009`_)::
 
-    raw.sff -> anoisetools -> AmpliconNoise
+    raw.sff -> anoisetools -> Processed Data
 
 The source for `AmpliconNoise`_ is also included.
 
-For decoded flowgram data, we target the original ``.sff`` files.
+For flowgram data, we target the original ``.sff`` files.
 
 
 Installation
@@ -31,139 +31,27 @@ Overview
 
     anoise [subcommand]
 
-In our analyses, we follow a process along the lines of:
+In our analyses, we might follow a process along the lines of::
 
-* Pass the ``.sff`` file into ``anoise split``, with the barcodes and 
-  primer used in the run
-* For each of the raw files produced, run ``anoise clean``
-* Run ``PyroDist``
-* Run ``FCluster``
-* Run ``PyroNoise``
-* Truncate the results with ``anoise truncate``
-* Run ``SeqNoise``
+  #!/bin/sh
+  MPIARGS="-np 12"
 
+  # Run PyroNoise
+  anoise pyronoise \
+    --mpi-args "$MPIARGS" \
+    --temp-dir $TMP_DIR \
+    sample.sff
 
-Scripts
--------
+  anoise truncate "{barcode}" 400 < sample-pnoise_cd.fa > sample-pnoise_trunc.fa
 
-``split``
-^^^^^^^^^
+  # Run SeqNoise
+  anoise seqnoise \
+    --mpi-args "$MPIARGS" \
+    --stub sample \
+    --temp-dir $TMP_DIR \
+    sample-pnoise_trunc.fa \
+    sample-pnoise.mapping
 
-::
-
-  usage: anoise split [-h] [--sff-file SFF_TXT] [--output-directory DIR]
-                      [--output-format FORMAT] [--unmatched-name UNMATCHED_NAME]
-                      BARCODE_FILE PRIMER
-
-  sff.txt splitter
-
-  positional arguments:
-    BARCODE_FILE          Path to barcode file with barcode_id,barcode_seq pairs
-    PRIMER                Regular expression identifying the primer used
-
-  optional arguments:
-    -h, --help            show this help message and exit
-    --sff-file SFF        SFF file. Default: stdin
-    --output-directory DIR
-                          Output directory for split files (default: .)
-    --output-format FORMAT
-                          Output format (choices: [anoise_raw, flower], default:
-                          anoise_raw)
-    --unmatched-name UNMATCHED_NAME
-                          Name for file containing unmatched records. Default:
-                          unmatched)
-
-  Given the input:
-
-    * A flower-converted Standard Flowgram File
-    * A file containing mappings from DNA sequence barcodes to a meaningful
-      identifier
-    * A regular expression to identify the primer sequence used
-
-  Writes to a series of files named after the meaningful identifiers provided,
-  each containing only those sequences from the input sff with the matching
-  barcode.
-
-  Any unmatched sequences are written to a separate file
-
-
-``clean``
-^^^^^^^^^
-
-::
-
-  usage: anoise clean [-h] [--min-flows MIN_FLOWS] [--max-flows MAX_FLOWS]
-                      [--input INPUT] [--flower-input]
-                      PRIMER OUTNAME
-
-  Clean flowgrams prior to processing with AmpliconNoise: enforce minimum
-  length, remove invalid data, trim.
-
-  positional arguments:
-    PRIMER                Regexp to identify primer sequence
-    OUTNAME               base name for output files - OUTNAME.fa and
-                          OUTNAME.dat
-
-  optional arguments:
-    -h, --help            show this help message and exit
-    --min-flows MIN_FLOWS
-                          Minimum length to accept sequence default: 360
-    --max-flows MAX_FLOWS
-                          Maximum length to trim sequences to default: 720
-    --input INPUT         Input data file (default: stdin)
-    --flower-input        Input is in flower-decoded .sff.txt format (default:
-                          False)
-
-The default arguments correspond to the recommended values for Titanium runs.
-
-``truncate``
-^^^^^^^^^^^^
-
-::
-
-    usage: anoise truncate [-h] <tag> <length>
-
-    Removes sequence <tag>, trims remaining sequence to <length> from FASTA-
-    formatted sequences passed to stdin, printing to stdout.
-
-    positional arguments:
-      <tag>       Sequence tag to remove if present. Interpreted as regex
-      <length>    Trim sequences to <length>
-
-    optional arguments:
-      -h, --help  show this help message and exit
-
-``wfasta``
-^^^^^^^^^^
-
-``wfasta`` works with the output files from ``SeqNoise`` and ``PyroNoise``,
-providing methods to strip records below a minimum frequency,
-transform the FASTA file to a tabular format, and/or repeat
-the records based on the observed frequency.
-
-::
-
-    usage: anoise wfasta [-h] [--min-frequency MIN_FREQUENCY]
-                         [--output-format {tabular,fasta}] [--repeat]
-                         infile outfile
-
-    positional arguments:
-      infile                Infile
-      outfile               Outfile
-
-    optional arguments:
-      -h, --help            show this help message and exit
-      --min-frequency MIN_FREQUENCY
-                            Minimum frequency for output
-      --output-format {tabular,fasta}
-                            Output format (choices: tabular, fasta, default:
-                            fasta)
-      --repeat              Repeat each record [frequency] times (default False)
-
-``raw2fasta``
-^^^^^^^^^^^^^
-
-Converts .raw files generated by AmpliclonNoise to FASTA.
 
 .. _AmpliconNoise: http://code.google.com/p/ampliconnoise/
 .. _Quince et al BMC Bioinformatics 2011: http://dx.doi.org/10.1186/1471-2105-12-38
