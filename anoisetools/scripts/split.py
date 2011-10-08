@@ -5,21 +5,37 @@ Split input FASTA files
 import argparse
 import collections
 import csv
+import errno
 import logging
+import re
 import multiprocessing
 import os
 import os.path
 import Queue
-import re
 
 from Bio import SeqIO
 
+
+# Map from Ambiguous Base to regex
+_AMBIGUOUS_MAP = {
+       'R': '[GA]',
+       'Y': '[TC]',
+       'K': '[GT]',
+       'M': '[AC]',
+       'S': '[GC]',
+       'W': '[AT]',
+       'B': '[GTC]',
+       'D': '[GAT]',
+       'H': '[ACT]',
+       'V': '[GCA]',
+       'N': '[AGCT]',
+}
 
 class SequenceWriter(object):
     """
     SequenceWriter writes sequences.
 
-    Designed to be run as a subprocess, instances are initialized with a
+    Run as a subprocess, instances are initialized with a
     queue from which to draw sequences, an output file path, and an output
     format.
 
@@ -44,6 +60,8 @@ class SequenceWriter(object):
             try:
                 # Try to pull a new item, waiting two seconds
                 record = self.queue.get(True, 2)
+
+                # None sent as a sentinal value for completed job
                 if record is None:
                     break
                 self.count.value += 1
@@ -57,19 +75,21 @@ class SequenceWriter(object):
         """
         SeqIO.write(iter(self), self.path, self.sequence_format)
 
-
 def load_barcodes(fp):
     d = {}
     reader = csv.reader(fp)
     for record in reader:
-        value, key = record[:2]
-        if key in d:
-            raise ValueError("Duplicate key: {0}".format(key))
-        if value in d.values():
-            raise ValueError("Duplicate value: {0}".format(value))
-        d[key] = value
+        name, barcode, primer = record[:3]
+        if barcode in d:
+            raise ValueError("Duplicate key: {0}".format(barcode))
+        if name in d.values():
+            raise ValueError("Duplicate value: {0}".format(name))
+        d[barcode] = (name, primer)
 
     return d
+
+def _ambiguous_regex(sequence_str):
+    return re.compile(''.join(_AMBIGUOUS_MAP.get(c, c) for c in sequence_str))
 
 class AlreadyOpenError(BaseException):
     """
@@ -84,20 +104,23 @@ class SequenceSplitter(object):
     """
     barcode_start = 4
 
-    def __init__(self, primer, barcodes, make_dirs=False,
+    def __init__(self, barcodes, make_dirs=False,
             unmatched_name="unknown.sff", output_format='sff'):
         self.barcodes = barcodes
+        self.primers = dict((k, _ambiguous_regex(v[1]))
+                            for k, v in barcodes.items())
 
         min_len = min(len(barcode) for barcode in barcodes)
         max_len = max(len(barcode) for barcode in barcodes)
-        self.primer = primer
-        self.barcode_re = re.compile(
-                '^(.{{{0},{1}}}){2}'.format(min_len, max_len, primer),
-                re.IGNORECASE)
-        self._output_files = {}
+        if min_len != max_len:
+            raise ValueError("Unequal barcode lengths are not supported")
+
+        self.barcode_length = max_len
         self.output_format = output_format
         self.make_dirs = make_dirs
         self.unmatched_name = unmatched_name
+
+        self._output_files = {}
 
     def open(self):
         """
@@ -109,15 +132,15 @@ class SequenceSplitter(object):
         writer_templates = []
 
         # Build a list of barcode, filepath tuples to construct writers from
-        for barcode, identifier in self.barcodes.items():
+        for barcode, (identifier, primer) in self.barcodes.items():
             path = identifier + '.' + self.output_format
             if self.make_dirs:
                 path = os.path.join(identifier, path)
             try:
                 os.makedirs(os.path.dirname(path))
             except OSError, e:
-                if e.errno == 17:
-                    pass
+                if e.errno != errno.EEXIST:
+                    raise
 
             writer_templates.append((barcode, path))
 
@@ -154,14 +177,15 @@ class SequenceSplitter(object):
         counter = collections.Counter()
         for sequence in sequences:
             seq_str = str(sequence.seq)[self.barcode_start:]
-            m = self.barcode_re.match(seq_str)
-            if m:
-                barcode = m.group(1)
-                counter[barcode] += 1
-                queue = self._output_files.get(barcode,
-                                               self._output_files[None])[0]
-            else:
-                queue = self._output_files[None][0]
+            barcode = seq_str[:self.barcode_length]
+
+            queue = self._output_files[None][0]
+            if barcode in self.barcodes:
+                primer_re = self.primers[barcode]
+                if primer_re.match(seq_str[self.barcode_length:]):
+                    counter[barcode] += 1
+                    queue = self._output_files.get(barcode,
+                                                   self._output_files[None])[0]
 
             # There's a problem pickling BioPython _RestrictedDict
             # instances. Here's a hack to try to work around:
@@ -182,10 +206,9 @@ def build_parser(subparsers):
     """
     parser = subparsers.add_parser('split', help="Split an .sff")
 
-    parser.add_argument("primer", help="""Sequence primer used,
-            as regular expression""")
     parser.add_argument("barcode_file", type=argparse.FileType('r'),
-            help="""Path to barcode file with barcode_id,barcode_seq pairs""")
+            help="""Path to barcode file with barcode_id,barcode_seq,primer
+            tuples. Ambiguous characters are accepted.""")
     parser.add_argument("input_file", metavar="SFF",
             type=argparse.FileType('rb'),
             help="""Path to input SFF (use - for stdin)""")
@@ -211,7 +234,7 @@ def main(parsed):
 
     with parsed.input_file:
         sequences = SeqIO.parse(parsed.input_file, 'sff')
-        splitter = SequenceSplitter(parsed.primer, barcodes,
+        splitter = SequenceSplitter(barcodes,
                                     parsed.make_dirs, parsed.unmatched_name)
         try:
             splitter.open()
