@@ -234,9 +234,8 @@ def build_parser(subparsers):
     parser.add_argument("barcode_file", type=argparse.FileType('r'),
             help="""Path to barcode file with barcode_id,barcode_seq,primer
             tuples. Ambiguous characters are accepted.""")
-    parser.add_argument("input_file", metavar="SFF",
-            type=argparse.FileType('rb'),
-            help="""Path to input SFF (use - for stdin)""")
+    parser.add_argument("input_files", metavar="SFF",
+            nargs='+', help="""Path to input SFF (use - for stdin)""")
     parser.add_argument("--make-dirs", action="store_true", default=False,
             help="Make a subdirectory for each output file")
     parser.add_argument('--unmatched-name',
@@ -257,9 +256,11 @@ def main(parsed):
     with parsed.barcode_file:
         barcodes = load_barcodes(parsed.barcode_file)
 
-    with parsed.input_file:
-        sequences = SeqIO.parse(parsed.input_file, 'sff')
-        splitter = SequenceSplitter(barcodes,
-                                    parsed.make_dirs, parsed.unmatched_name)
-        with splitter:
-            splitter.run(sequences)
+    # Load sequences across input files
+    sequences = (sequence for seq_file in parsed.input_files
+                 for sequence in SeqIO.parse(seq_file, 'sff'))
+
+    splitter = SequenceSplitter(barcodes,
+                                parsed.make_dirs, parsed.unmatched_name)
+    with splitter:
+        splitter.run(sequences)
