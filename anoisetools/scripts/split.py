@@ -31,6 +31,9 @@ _AMBIGUOUS_MAP = {
        'N': '[AGCT]',
 }
 
+_WriterTuple = collections.namedtuple('WriterTuple',
+        ['queue', 'writer', 'process'])
+
 class SequenceWriter(object):
     """
     SequenceWriter writes sequences.
@@ -126,8 +129,15 @@ class SequenceSplitter(object):
         self.make_dirs = make_dirs
         self.unmatched_name = unmatched_name
 
-        self._output_files = collections.defaultdict(dict)
+        self._output_files = {}
         self._barcode_primer_name = {}
+
+    def __enter__(self):
+        self.open()
+        return self
+
+    def __exit__(self, *args):
+        self.close()
 
     def open(self):
         """
@@ -150,9 +160,9 @@ class SequenceSplitter(object):
                     if e.errno != errno.EEXIST:
                         raise
 
-                self._barcode_primer_name[barcode, primer] = identifier
+                self._barcode_primer_name[barcode, primer.pattern] = identifier
 
-            writer_templates.append((barcode, primer, path))
+                writer_templates.append((barcode, primer.pattern, path))
 
         # Special case: unmatched barcodes
         writer_templates.append((None, None, self.unmatched_name))
@@ -164,28 +174,32 @@ class SequenceSplitter(object):
             # Create a process to write output records
             process = multiprocessing.Process(target=writer.write)
             process.start()
-            self._output_files[barcode][primer] = queue, writer, process
-
-    def __enter__(self):
-        self.open()
-        return self
-
-    def __exit__(self, *args):
-        self.close()
+            self._output_files[barcode, primer] = \
+                _WriterTuple(queue, writer, process)
 
     @property
-    def _default_writer(self):
-        return self._output_files[None][None]
+    def _default_queue(self):
+        return self._get_queue(None, None)
+
+    def _get_primers(self, barcode):
+        return [primer for primer, identifer in self.barcodes.get(barcode, [])]
+
+    def _get_queue(self, barcode, primer_re):
+        p = primer_re.pattern if primer_re else None
+        return self._output_files[barcode, p].queue
+
+    def _get_name(self, barcode, primer_re):
+        p = primer_re.pattern if primer_re else None
+        return self._barcode_primer_name.get((barcode, p))
 
     def close(self):
         """
         Close all the output files
         """
-        for queue, writer, process in (v for i in self._output_files.values()
-                                       for v in i.values()):
+        for i in self._output_files.values():
             # Sentinal - no more records to process
-            queue.put(None)
-            process.join()
+            i.queue.put(None)
+            i.process.join()
 
         self._output_files = {}
 
@@ -203,20 +217,14 @@ class SequenceSplitter(object):
             seq_str = str(sequence.seq)[self.barcode_start:]
             barcode = seq_str[:self.barcode_length]
 
-            queue = self._default_writer[0]
+            queue = self._default_queue
             if barcode in self.barcodes:
-                primers = self._output_files[barcode]
+                primers = self._get_primers(barcode)
                 for primer_re in primers:
                     if primer_re.match(seq_str[self.barcode_length:]):
-                        name = self._barcode_primer_name[barcode, primer_re]
+                        name = self._barcode_primer_name[barcode, primer_re.pattern]
                         counter[name] += 1
-                        queue = self._output_files[barcode][primer_re][0]
-
-            # There's a problem pickling BioPython _RestrictedDict
-            # instances. Here's a hack to try to work around:
-            # Convert the internal SeqRecord._per_letter_annotations
-            # to a plain old Python dict.
-            sequence._per_letter_annotations = sequence.letter_annotations.copy()
+                        queue = self._get_queue(barcode, primer_re)
 
             queue.put(sequence)
 
