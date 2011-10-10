@@ -3,9 +3,6 @@
 import logging
 import os
 import os.path
-import multiprocessing
-import shlex
-import tempfile
 
 from anoisetools.scripts import clean, sff2raw
 from anoisetools import anoiseio, run
@@ -22,6 +19,8 @@ def build_parser(subparsers):
     pnoise_opts.add_argument('-c', '--cutoff', type=float,
             default=0.01, help="""Initial cutoff (see Quince et al) [default:
             %(default)s]""")
+    pnoise_opts.add_argument('-rin', '--lookup-file',
+            help="""Lookup file""")
 
     parser.add_argument('sff_file', help="""SFF file""")
     parser.add_argument('-v', '--verbose', default=logging.INFO,
@@ -71,15 +70,23 @@ def main(arguments):
 
         logging.info("Starting PyroNoise")
         run_pyronoise(runner, clean_dat, arguments.sigma,
-                arguments.cutoff, arguments.stub, arguments.use_m)
+                arguments.cutoff, arguments.stub, arguments.use_m,
+                lookup_name=arguments.lookup_file)
 
 
-def run_pyronoise(runner, dat_path, sigma, cutoff, output_stub, use_m=False):
+def run_pyronoise(runner, dat_path, sigma, cutoff, output_stub, use_m=False,
+        lookup_name=None):
     m = run.executable_transformer(use_m)
     pnoise_stub = output_stub + '-pnoise'
     runner.run(['PyroDist', '-in', dat_path, '-out', output_stub])
     runner.run([m('FCluster'), '-in', output_stub + '.fdist',
         '-out', output_stub + '-initial'])
-    runner.run([m('PyroNoise'), '-din', dat_path, '-out', pnoise_stub,
-            '-lin', output_stub + '-initial.list', '-s', sigma,
-            '-c', cutoff])
+    cmd = [m('PyroNoise'),
+           '-din', dat_path,
+           '-out', pnoise_stub,
+           '-lin', output_stub + '-initial.list',
+           '-s', sigma,
+           '-c', cutoff]
+    if lookup_name:
+        cmd.extend(('-rin', lookup_name))
+    runner.run(cmd)

@@ -9,13 +9,15 @@ def build_parser(subparsers):
     parser = subparsers.add_parser("seqnoise", help="Run SeqNoise",
             parents=[run.base_parser()])
 
-    pnoise_opts = parser.add_argument_group("SeqNoise Options")
-    pnoise_opts.add_argument('-s', '--sigma', type=float,
+    snoise_opts = parser.add_argument_group("SeqNoise Options")
+    snoise_opts.add_argument('-s', '--sigma', type=float,
             default=30.0, help="""Sigma (see Quince et al)
             [default: %(default)s]""")
-    pnoise_opts.add_argument('-c', '--cutoff', type=float,
+    snoise_opts.add_argument('-c', '--cutoff', type=float,
             default=0.08, help="""Initial cutoff (see Quince et al) [default:
             %(default)s]""")
+    snoise_opts.add_argument('-rin', '--lookup-file',
+            help="""Lookup file""")
 
     parser.add_argument('-v', '--verbose', default=logging.INFO,
         action="store_const", const=logging.DEBUG)
@@ -42,10 +44,10 @@ def main(arguments):
         logging.info("Running SeqNoise")
         run_seqnoise(runner, arguments.fasta_file, arguments.mapping_file,
             arguments.sigma, arguments.cutoff, arguments.stub + '-snoise',
-            use_m=arguments.use_m)
+            use_m=arguments.use_m, lookup_file=arguments.lookup_file)
 
 def run_seqnoise(runner, fasta_file, pnoise_mapping, sigma, cutoff, stub,
-        use_m=False):
+        use_m=False, lookup_file=None):
     m = run.executable_transformer(use_m)
     # SeqDist
     seqdist_out = runner.path_join(stub + '.seqdist')
@@ -56,12 +58,14 @@ def run_seqnoise(runner, fasta_file, pnoise_mapping, sigma, cutoff, stub,
     fcluster_list = stub + '.list'
 
     # SeqNoise
-    runner.run([m('SeqNoise'),
+    cmd = [m('SeqNoise'),
                 '-in', os.path.abspath(fasta_file),
                 '-din', seqdist_out,
                 '-out', stub,
                 '-lin', fcluster_list,
                 '-min', os.path.abspath(pnoise_mapping),
                 '-c', cutoff,
-                '-s', sigma])
-
+                '-s', sigma]
+    if lookup_file:
+        cmd.extend(('-rin', lookup_file))
+    runner.run(cmd)
