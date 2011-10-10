@@ -61,9 +61,13 @@ def main(arguments):
         with open(raw_file) as raw_fp:
             reader = anoiseio.AnoiseRawReader(raw_fp)
             with open(runner.path_join(arguments.stub + '.fa'), 'w') as fa_fp:
-                clean.invoke(reader, fa_fp, clean_dat, arguments.primer,
-                        arguments.min_flows, arguments.max_flows,
-                        arguments.max_empty)
+                passed, failed = clean.invoke(reader, fa_fp, clean_dat,
+                        arguments.primer, arguments.min_flows,
+                        arguments.max_flows, arguments.max_empty)
+
+                if not passed:
+                    raise AssertionError(
+                            "No sequences passed flowgram cleaning!")
 
         logging.info("Starting PyroNoise")
         run_pyronoise(runner, clean_dat, arguments.sigma,
