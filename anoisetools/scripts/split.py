@@ -47,13 +47,12 @@ class SequenceWriter(object):
     None is encountered in the queue.
     """
 
-    def __init__(self, queue, path, sequence_format, name=None):
+    def __init__(self, queue, path, sequence_format):
         self.count = multiprocessing.Value('i', 0)
         self.queue = queue
         self.path = path
         self.sequence_format = sequence_format
         self.cancel = False
-        self.name = name
 
     def __iter__(self):
         """
@@ -173,8 +172,7 @@ class SequenceSplitter(object):
 
         for barcode, primer, path, name in writer_templates:
             queue = multiprocessing.Queue()
-            writer = SequenceWriter(queue, path, self.output_format,
-                    name=name)
+            writer = SequenceWriter(queue, path, self.output_format)
 
             # Create a process to write output records
             process = multiprocessing.Process(target=writer.write)
@@ -239,8 +237,8 @@ class SequenceSplitter(object):
         logging.info("Most common: %s" % '\n'.join(
                      ': '.join(map(str, i)) for i in counter.most_common(30)))
 
-        return [(i.writer.name, i.writer.count.value) for i in
-                self._output_files]
+        return [(i.writer.path, i.writer.count.value) for i in
+                self._output_files.values()]
 
 
 def build_parser(subparsers):
