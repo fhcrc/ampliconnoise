@@ -12,6 +12,7 @@ import multiprocessing
 import os
 import os.path
 import Queue
+import sys
 
 from Bio import SeqIO
 
@@ -36,7 +37,7 @@ _WriterTuple = collections.namedtuple('WriterTuple',
 
 class SequenceWriter(object):
     """
-    SequenceWriter writes sequences.
+    Worker which writes sequences
 
     Run as a subprocess, instances are initialized with a
     queue from which to draw sequences, an output file path, and an output
@@ -46,12 +47,13 @@ class SequenceWriter(object):
     None is encountered in the queue.
     """
 
-    def __init__(self, queue, path, sequence_format):
+    def __init__(self, queue, path, sequence_format, name=None):
         self.count = multiprocessing.Value('i', 0)
         self.queue = queue
         self.path = path
         self.sequence_format = sequence_format
         self.cancel = False
+        self.name = name
 
     def __iter__(self):
         """
@@ -162,14 +164,17 @@ class SequenceSplitter(object):
 
                 self._barcode_primer_name[barcode, primer.pattern] = identifier
 
-                writer_templates.append((barcode, primer.pattern, path))
+                writer_templates.append((barcode, primer.pattern, path,
+                    identifier))
 
         # Special case: unmatched barcodes
-        writer_templates.append((None, None, self.unmatched_name))
+        writer_templates.append((None, None, self.unmatched_name,
+                                 self.unmatched_name))
 
-        for barcode, primer, path in writer_templates:
+        for barcode, primer, path, name in writer_templates:
             queue = multiprocessing.Queue()
-            writer = SequenceWriter(queue, path, self.output_format)
+            writer = SequenceWriter(queue, path, self.output_format,
+                    name=name)
 
             # Create a process to write output records
             process = multiprocessing.Process(target=writer.write)
@@ -208,8 +213,10 @@ class SequenceSplitter(object):
         Iterates over sequences, writing them to the file associated with their
         barcode.
 
-        Any sequences which cannot be matched are written to a file named after
+        Any sequences which cannot be matched are written to file
         unmatched_name
+
+        Returns list of (file name, sequence count) tuples
         """
         # TODO: Count based on name
         counter = collections.Counter()
@@ -232,6 +239,9 @@ class SequenceSplitter(object):
         logging.info("Most common: %s" % '\n'.join(
                      ': '.join(map(str, i)) for i in counter.most_common(30)))
 
+        return [(i.writer.name, i.writer.count.value) for i in
+                self._output_files]
+
 
 def build_parser(subparsers):
     """
@@ -249,6 +259,9 @@ def build_parser(subparsers):
     parser.add_argument('--unmatched-name',
             help="""Name for file with unmatched sequences [default:
             %(default)s]""", default="unmatched.sff")
+    parser.add_argument('-o', '--outfile', help="""Name of file to write
+            sequence counts [default: stdout]""", default=sys.stdout,
+            type=argparse.FileType('w'))
 
     return parser
 
@@ -271,4 +284,9 @@ def main(parsed):
     splitter = SequenceSplitter(barcodes,
                                 parsed.make_dirs, parsed.unmatched_name)
     with splitter:
-        splitter.run(sequences)
+        result = splitter.run(sequences)
+
+    with parsed.outfile as fp:
+        print >> fp, 'fname\tcount'
+        for n, c in result:
+            print >> fp, '{0}\t{1}'.format(n, c)
