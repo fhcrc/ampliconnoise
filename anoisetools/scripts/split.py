@@ -73,19 +73,26 @@ class SequenceWriter(object):
         """
         Write sequences passed to the input queue to self.path
         """
-        SeqIO.write(iter(self), self.path, self.sequence_format)
+        try:
+            SeqIO.write(iter(self), self.path, self.sequence_format)
+        except ValueError, e:
+            if str(e) == 'Must have at least one sequence':
+                logging.warn("no sequences for {0}".format(self.path))
+                os.remove(self.path)
+            else:
+                raise
 
 def _ambiguous_regex(sequence_str):
     return re.compile(''.join(_AMBIGUOUS_MAP.get(c, c) for c in sequence_str))
 
 def load_barcodes(fp):
     d = collections.defaultdict(list)
+    def vals():
+        return [n for v in d.values() for p, n in v]
     reader = csv.reader(fp)
     for record in reader:
         name, barcode, primer = record[:3]
-        if barcode in d:
-            raise ValueError("Duplicate key: {0}".format(barcode))
-        if name in (name for p, name in d.values()):
+        if name in vals():
             raise ValueError("Duplicate value: {0}".format(name))
         d[barcode].append((_ambiguous_regex(primer), name))
 
@@ -148,7 +155,7 @@ class SequenceSplitter(object):
             writer_templates.append((barcode, primer, path))
 
         # Special case: unmatched barcodes
-        writer_templates.append((None, self.unmatched_name))
+        writer_templates.append((None, None, self.unmatched_name))
 
         for barcode, primer, path in writer_templates:
             queue = multiprocessing.Queue()
@@ -165,6 +172,10 @@ class SequenceSplitter(object):
 
     def __exit__(self, *args):
         self.close()
+
+    @property
+    def _default_writer(self):
+        return self._output_files[None][None]
 
     def close(self):
         """
@@ -192,16 +203,14 @@ class SequenceSplitter(object):
             seq_str = str(sequence.seq)[self.barcode_start:]
             barcode = seq_str[:self.barcode_length]
 
-            queue = self._output_files[None][0]
+            queue = self._default_writer[0]
             if barcode in self.barcodes:
-                primers = self.primers[barcode]
+                primers = self._output_files[barcode]
                 for primer_re in primers:
                     if primer_re.match(seq_str[self.barcode_length:]):
                         name = self._barcode_primer_name[barcode, primer_re]
                         counter[name] += 1
-                        queue = self._output_files.get(
-                                barcode, self._output_files[None])[0]
-
+                        queue = self._output_files[barcode][primer_re][0]
 
             # There's a problem pickling BioPython _RestrictedDict
             # instances. Here's a hack to try to work around:
