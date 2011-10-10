@@ -75,21 +75,22 @@ class SequenceWriter(object):
         """
         SeqIO.write(iter(self), self.path, self.sequence_format)
 
+def _ambiguous_regex(sequence_str):
+    return re.compile(''.join(_AMBIGUOUS_MAP.get(c, c) for c in sequence_str))
+
 def load_barcodes(fp):
-    d = {}
+    d = collections.defaultdict(list)
     reader = csv.reader(fp)
     for record in reader:
         name, barcode, primer = record[:3]
         if barcode in d:
             raise ValueError("Duplicate key: {0}".format(barcode))
-        if name in d.values():
+        if name in (name for p, name in d.values()):
             raise ValueError("Duplicate value: {0}".format(name))
-        d[barcode] = (name, primer)
+        d[barcode].append((_ambiguous_regex(primer), name))
 
     return d
 
-def _ambiguous_regex(sequence_str):
-    return re.compile(''.join(_AMBIGUOUS_MAP.get(c, c) for c in sequence_str))
 
 class AlreadyOpenError(BaseException):
     """
@@ -107,8 +108,6 @@ class SequenceSplitter(object):
     def __init__(self, barcodes, make_dirs=False,
             unmatched_name="unknown.sff", output_format='sff'):
         self.barcodes = barcodes
-        self.primers = dict((k, _ambiguous_regex(v[1]))
-                            for k, v in barcodes.items())
 
         min_len = min(len(barcode) for barcode in barcodes)
         max_len = max(len(barcode) for barcode in barcodes)
@@ -120,7 +119,8 @@ class SequenceSplitter(object):
         self.make_dirs = make_dirs
         self.unmatched_name = unmatched_name
 
-        self._output_files = {}
+        self._output_files = collections.defaultdict(dict)
+        self._barcode_primer_name = {}
 
     def open(self):
         """
@@ -132,35 +132,47 @@ class SequenceSplitter(object):
         writer_templates = []
 
         # Build a list of barcode, filepath tuples to construct writers from
-        for barcode, (identifier, primer) in self.barcodes.items():
-            path = identifier + '.' + self.output_format
-            if self.make_dirs:
-                path = os.path.join(identifier, path)
-            try:
-                os.makedirs(os.path.dirname(path))
-            except OSError, e:
-                if e.errno != errno.EEXIST:
-                    raise
+        for barcode, primer_list in self.barcodes.items():
+            for primer, identifier in primer_list:
+                path = identifier + '.' + self.output_format
+                if self.make_dirs:
+                    path = os.path.join(identifier, path)
+                try:
+                    os.makedirs(os.path.dirname(path))
+                except OSError, e:
+                    if e.errno != errno.EEXIST:
+                        raise
 
-            writer_templates.append((barcode, path))
+                self._barcode_primer_name[barcode, primer] = identifier
+
+            writer_templates.append((barcode, primer, path))
 
         # Special case: unmatched barcodes
         writer_templates.append((None, self.unmatched_name))
 
-        for barcode, path in writer_templates:
+        for barcode, primer, path in writer_templates:
             queue = multiprocessing.Queue()
             writer = SequenceWriter(queue, path, self.output_format)
 
             # Create a process to write output records
             process = multiprocessing.Process(target=writer.write)
             process.start()
-            self._output_files[barcode] = queue, writer, process
+            self._output_files[barcode][primer] = queue, writer, process
+
+    def __enter__(self):
+        self.open()
+        return self
+
+    def __exit__(self, *args):
+        self.close()
 
     def close(self):
         """
         Close all the output files
         """
-        for queue, writer, process in self._output_files.values():
+        for queue, writer, process in (v for i in self._output_files.values()
+                                       for v in i.values()):
+            # Sentinal - no more records to process
             queue.put(None)
             process.join()
 
@@ -174,6 +186,7 @@ class SequenceSplitter(object):
         Any sequences which cannot be matched are written to a file named after
         unmatched_name
         """
+        # TODO: Count based on name
         counter = collections.Counter()
         for sequence in sequences:
             seq_str = str(sequence.seq)[self.barcode_start:]
@@ -181,11 +194,13 @@ class SequenceSplitter(object):
 
             queue = self._output_files[None][0]
             if barcode in self.barcodes:
-                primer_re = self.primers[barcode]
-                if primer_re.match(seq_str[self.barcode_length:]):
-                    counter[barcode] += 1
-                    queue = self._output_files.get(barcode,
-                                                   self._output_files[None])[0]
+                primers = self.primers[barcode]
+                for primer_re in primers:
+                    if primer_re.match(seq_str[self.barcode_length:]):
+                        counter[barcode] += 1
+                        queue = self._output_files.get(
+                                barcode, self._output_files[None])[0]
+
 
             # There's a problem pickling BioPython _RestrictedDict
             # instances. Here's a hack to try to work around:
@@ -236,8 +251,5 @@ def main(parsed):
         sequences = SeqIO.parse(parsed.input_file, 'sff')
         splitter = SequenceSplitter(barcodes,
                                     parsed.make_dirs, parsed.unmatched_name)
-        try:
-            splitter.open()
+        with splitter:
             splitter.run(sequences)
-        finally:
-            splitter.close()
