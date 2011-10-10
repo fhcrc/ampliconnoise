@@ -88,13 +88,12 @@ class _WFastaFastaWriter(_WFastaWriter):
         seqid = sequence.id
 
         if self.repeat is True:
-            current_id = record.id
             for i in xrange(parsed_header.frequency):
-                new_header = '{0}_{1}'.format(current_id, i)
+                new_header = '{0}_{1}'.format(seqid, i)
                 sequence.id = new_header
-                SeqIO.write([sequence], fp, 'fasta')
+                SeqIO.write([sequence], self.fp, 'fasta')
         else:
-            SeqIO.write([sequence], fp, 'fasta')
+            SeqIO.write([sequence], self.fp, 'fasta')
 
 
 _OUTPUT_FORMATS = {'fasta': _WFastaFastaWriter,
