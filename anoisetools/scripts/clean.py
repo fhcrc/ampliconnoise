@@ -202,6 +202,8 @@ def invoke(reader, fa_handle, dat_path, primer, min_flows, max_flows,
             # Copy from temp file to final file
             shutil.copyfileobj(dat_handle, dat_fp)
 
+    return flowgram_filter.passed, flowgram_filter.failed
+
 
 def main(parsed):
     """
