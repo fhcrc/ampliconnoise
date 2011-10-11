@@ -6,6 +6,7 @@ import argparse
 import collections
 import csv
 import errno
+import json
 import logging
 import re
 import multiprocessing
@@ -47,12 +48,16 @@ class SequenceWriter(object):
     None is encountered in the queue.
     """
 
-    def __init__(self, queue, path, sequence_format):
+    def __init__(self, queue, path, sequence_format, barcode=None,
+            primer=None):
         self.count = multiprocessing.Value('i', 0)
         self.queue = queue
         self.path = path
         self.sequence_format = sequence_format
         self.cancel = False
+
+        self.barcode = barcode
+        self.primer = primer
 
     def __iter__(self):
         """
@@ -86,6 +91,18 @@ class SequenceWriter(object):
             else:
                 raise
 
+    def write_control(self):
+        control_path = os.path.join(os.path.dirname(self.path), 'control.json')
+        d = {'primer': self.primer,
+             'barcode': self.barcode,
+             'sequence_file': os.path.basename(self.path),
+             'output_format': self.sequence_format,
+             'sequence_count': self.count.value}
+
+        with open(control_path, 'w') as fp:
+            json.dump(d, fp, indent=2)
+            fp.write('\n')
+
 def _ambiguous_regex(sequence_str):
     return re.compile(''.join(_AMBIGUOUS_MAP.get(c, c) for c in sequence_str))
 
@@ -117,7 +134,8 @@ class SequenceSplitter(object):
     barcode_start = 4
 
     def __init__(self, barcodes, make_dirs=False,
-            unmatched_name="unknown.sff", output_format='sff'):
+            unmatched_name="unknown.sff", output_format='sff',
+            write_controls=False):
         self.barcodes = barcodes
 
         min_len = min(len(barcode) for barcode in barcodes)
@@ -129,6 +147,7 @@ class SequenceSplitter(object):
         self.output_format = output_format
         self.make_dirs = make_dirs
         self.unmatched_name = unmatched_name
+        self.write_controls = write_controls
 
         self._output_files = {}
         self._barcode_primer_name = {}
@@ -172,7 +191,8 @@ class SequenceSplitter(object):
 
         for barcode, primer, path, name in writer_templates:
             queue = multiprocessing.Queue()
-            writer = SequenceWriter(queue, path, self.output_format)
+            writer = SequenceWriter(queue, path, self.output_format,
+                    barcode=barcode, primer=primer)
 
             # Create a process to write output records
             process = multiprocessing.Process(target=writer.write)
@@ -216,7 +236,6 @@ class SequenceSplitter(object):
 
         Returns list of (file name, sequence count) tuples
         """
-        # TODO: Count based on name
         counter = collections.Counter()
         for sequence in sequences:
             seq_str = str(sequence.seq)[self.barcode_start:]
@@ -237,9 +256,14 @@ class SequenceSplitter(object):
         logging.info("Most common: %s" % '\n'.join(
                      ': '.join(map(str, i)) for i in counter.most_common(30)))
 
+        # Generate control.json
+        if self.write_controls:
+            for writer in (i.writer for i in self._output_files.values()):
+                writer.write_control()
+
+
         return [(i.writer.path, i.writer.count.value) for i in
                 self._output_files.values()]
-
 
 def build_parser(subparsers):
     """
@@ -260,6 +284,8 @@ def build_parser(subparsers):
     parser.add_argument('-o', '--outfile', help="""Name of file to write
             sequence counts [default: stdout]""", default=sys.stdout,
             type=argparse.FileType('w'))
+    parser.add_argument('--write-control', default=argparse.SUPPRESS,
+            action='store_true', help="""Write control.json files""")
 
     return parser
 
@@ -280,7 +306,8 @@ def main(parsed):
                  for sequence in SeqIO.parse(seq_file, 'sff'))
 
     splitter = SequenceSplitter(barcodes,
-                                parsed.make_dirs, parsed.unmatched_name)
+                                parsed.make_dirs, parsed.unmatched_name,
+                                write_controls=parsed.write_control)
     with splitter:
         result = splitter.run(sequences)
 
