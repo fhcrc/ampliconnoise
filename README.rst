@@ -13,8 +13,8 @@ For flowgram data, we target the original ``.sff`` files.
 Installation
 ------------
 
-1. Make sure your system meets the requirements (currently, just Python
-   version 2.7 and `Biopython`_)
+1. Make sure your system meets the requirements (currently: Python
+   version 2.7, `Biopython`_, and the AmpliconNoise binaries in your path)
 2. Run::
 
     git clone git://github.com/fhcrc/ampliconnoise.git
