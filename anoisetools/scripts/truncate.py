@@ -1,6 +1,7 @@
 import re
 import sys
 
+from anoisetools.util import ambiguous_pattern
 
 def build_parser(subparsers):
     """
@@ -11,8 +12,9 @@ def build_parser(subparsers):
              description="""Removes sequence <tag>,
 trims remaining sequence to <length> from FASTA-formatted sequences passed
 to stdin, printing to stdout.""")
-    parser.add_argument('barcode', metavar='<tag>',
-            help='Sequence tag to remove if present. Interpreted as regex')
+    parser.add_argument('barcode', metavar='<tag>', help="""Sequence tag to
+            remove if present. IUPAC ambiguous characters are accepted.""",
+            type=ambiguous_pattern)
     parser.add_argument('length', metavar='<length>',
             help='Trim sequences to <length>', type=int)
     return parser
@@ -27,15 +29,14 @@ def trim(barcode, length, in_handle, out_handle):
     Note:
     Sequences passed must be on a single line.
     """
-    # trim leading G's
-    # TODO: Follow up with Chris on why this is done.
-    #       it *is* needed.
-    # Likely: records are read TCAG, we trim the first 4 *flows*, which won't
+    # Records are read TCAG, we trim the first 4 *flows*, which won't
     # detect duplicate G's.
     barcode = barcode.lstrip('G')
     lines = (line.rstrip() for line in in_handle)
 
     pattern = re.compile('{0}(.*)'.format(barcode))
+
+
 
     for line in lines:
         if line.startswith('>'):

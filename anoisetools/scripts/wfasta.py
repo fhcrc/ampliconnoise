@@ -7,7 +7,7 @@ import collections
 import re
 import sys
 
-from anoisetools import fastaio
+from Bio import SeqIO
 
 
 WeightedFastaHeader = collections.namedtuple('WeightedFastaHeader',
@@ -87,15 +87,13 @@ class _WFastaFastaWriter(_WFastaWriter):
         parsed_header = _parse_wfasta_header(sequence.id)
         seqid = sequence.id
 
-        towrite = []
         if self.repeat is True:
             for i in xrange(parsed_header.frequency):
-                new_header = '{0}_{1}'.format(sequence.id, i)
-                towrite.append(fastaio.Sequence(new_header, sequence.seq))
+                new_header = '{0}_{1}'.format(seqid, i)
+                sequence.id = new_header
+                SeqIO.write([sequence], self.fp, 'fasta')
         else:
-            towrite.append(sequence)
-
-        fastaio.write_fasta(towrite, self.fp)
+            SeqIO.write([sequence], self.fp, 'fasta')
 
 
 _OUTPUT_FORMATS = {'fasta': _WFastaFastaWriter,
@@ -133,5 +131,5 @@ def main(parsed):
             writer = writer_class(parsed.outfile, parsed.min_frequency,
                                   parsed.repeat)
 
-            for sequence in fastaio.parse_fasta(parsed.infile):
+            for sequence in SeqIO.parse(parsed.infile, 'fasta'):
                 writer.writerecord(sequence)

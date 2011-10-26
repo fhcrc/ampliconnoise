@@ -1,14 +1,18 @@
 import argparse
+import logging
 import sys
 
 
-SUBCOMMANDS = ('clean', 'raw2fasta', 'split', 'truncate', 'wfasta')
+SUBCOMMANDS = ('clean', 'redup', 'split', 'pyronoise', 'seqnoise', 'truncate', 'wfasta', 'sff2raw')
 
 
 def main(args=sys.argv[1:]):
     """
     Parses arguments, passes execution to the appropriate subcommand.
     """
+    logging.basicConfig(level=logging.INFO,
+            format="[%(asctime)-15s %(levelname)s] %(message)s")
+
     parser = argparse.ArgumentParser(description="""Prepare data for use with
 AmpliconNoise""")
     subparsers = parser.add_subparsers(title='Commands', help="Valid commands")

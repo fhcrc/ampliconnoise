@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-from anoisetools.scripts.dispatch import main
-
 if __name__ == '__main__':
+    from anoisetools.scripts.dispatch import main
     main()
