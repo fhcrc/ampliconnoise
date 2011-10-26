@@ -50,7 +50,7 @@ will fill ``./sample1/sample1.sff``, with all sequences starting with
 
 Degenerate primers should be specified as such.
 
-If the barcode map is names ``barcodes.csv``, and the full SFF is ``G0YK51K01.sff``,
+If the barcode map is named ``barcodes.csv``, and the full SFF is ``G0YK51K01.sff``,
 one would call [1]_::
 
   anoise split barcodes.csv G0YK51K01.sff
@@ -78,8 +78,8 @@ For each sample in our analyses, we follow a process along the lines of::
     --mpi-args "$MPIARGS" \
     --stub sample1 \
     --temp-dir $TMP_DIR \
-    sample-pnoise_trunc.fa \
-    sample-pnoise.mapping
+    sample1-pnoise_trunc.fa \
+    sample1-pnoise.mapping
 
 Both ``pyronoise`` and ``seqnoise`` create a temporary direcory for processing.
 If running MPI jobs spanning multiple nodes, be sure to set ``--temp-dir`` to a
