@@ -8,7 +8,6 @@ import csv
 import errno
 import json
 import logging
-import re
 import multiprocessing
 import os
 import os.path
@@ -17,21 +16,7 @@ import sys
 
 from Bio import SeqIO
 
-
-# Map from Ambiguous Base to regex
-_AMBIGUOUS_MAP = {
-       'R': '[GA]',
-       'Y': '[TC]',
-       'K': '[GT]',
-       'M': '[AC]',
-       'S': '[GC]',
-       'W': '[AT]',
-       'B': '[GTC]',
-       'D': '[GAT]',
-       'H': '[ACT]',
-       'V': '[GCA]',
-       'N': '[AGCT]',
-}
+from anoisetools.util import ambiguous_regex
 
 _WriterTuple = collections.namedtuple('WriterTuple',
         ['queue', 'writer', 'process'])
@@ -103,9 +88,6 @@ class SequenceWriter(object):
             json.dump(d, fp, indent=2)
             fp.write('\n')
 
-def _ambiguous_regex(sequence_str):
-    return re.compile(''.join(_AMBIGUOUS_MAP.get(c, c) for c in sequence_str))
-
 def load_barcodes(fp):
     d = collections.defaultdict(list)
     def vals():
@@ -115,7 +97,7 @@ def load_barcodes(fp):
         name, barcode, primer = record[:3]
         if name in vals():
             raise ValueError("Duplicate value: {0}".format(name))
-        d[barcode].append((_ambiguous_regex(primer), name))
+        d[barcode].append((ambiguous_regex(primer), name))
 
     return d
 

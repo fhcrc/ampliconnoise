@@ -22,7 +22,7 @@ import shutil
 import sys
 import tempfile
 
-from anoisetools import sff, anoiseio
+from anoisetools import sff, anoiseio, util
 
 
 # Default minimum clean flows to keep a read
@@ -48,7 +48,8 @@ trim."""
             help="Maximum length to trim sequences to "
             "default: %(default)s", default=DEFAULT_MAX_FLOWS)
     parser.add_argument('primer', metavar='PRIMER',
-            help="Regexp to identify primer sequence")
+            help="Primer sequence (ambiguous bases accepted)",
+            type=util.ambiguous_pattern)
     parser.add_argument('--max-empty',
             type=int, default=0, help="""Maximum empty flowgrams (default: %(default)s)""")
     parser.add_argument('outname', metavar="OUTNAME",

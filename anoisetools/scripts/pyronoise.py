@@ -5,7 +5,7 @@ import os
 import os.path
 
 from anoisetools.scripts import clean, sff2raw
-from anoisetools import anoiseio, run
+from anoisetools import anoiseio, run, util
 
 
 def build_parser(subparsers):
@@ -35,7 +35,7 @@ def build_parser(subparsers):
             help="""Maximum empty flowgrams to accept before truncation
             [default: %(default)s]""")
     clean_group.add_argument('--primer', default='.',
-            help="Regular expression to identify primer")
+            help="Primer used", type=util.ambiguous_pattern)
 
     return parser
 
