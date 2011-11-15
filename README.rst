@@ -18,7 +18,7 @@ Installation
 2. Run::
 
     git clone git://github.com/fhcrc/ampliconnoise.git
-    cd ampliconnoise && python2.7 setup.py
+    cd ampliconnoise && python2.7 setup.py install
 
 Running setup.py installs the ``anoisetools`` package, mostly accessible from
 the ``anoise`` script.
