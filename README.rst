@@ -13,12 +13,18 @@ For flowgram data, we target the original ``.sff`` files.
 Installation
 ------------
 
-1. Make sure your system meets the requirements (currently: Python
-   version 2.7, `Biopython`_, and the AmpliconNoise binaries in your path)
-2. Run::
+0. Ensure that your computer meets the minimum requirements. Currently, just
+   Python 2.7, plus the requirements of AmpliconNoise.
+1. Install `BioPython`_ if you don't have it. Note that numpy is *not* required
+   for this project. If you're not planning to use BioPython, you can answer
+   "No" when the BioPython installer prompts you about numpy.
+2. Download and install::
 
-    git clone git://github.com/fhcrc/ampliconnoise.git
-    cd ampliconnoise && python2.7 setup.py install
+    curl -L https://github.com/fhcrc/ampliconnoise/tarball/master | tar xjf -
+    cd fhcrc-ampliconnoise-*
+    sudo python2.7 setup.py install
+3. Build the AmpliconNoise binaries, and ensure they're present in your
+   ``path``
 
 Running setup.py installs the ``anoisetools`` package, mostly accessible from
 the ``anoise`` script.
@@ -30,7 +36,7 @@ Overview
 
     anoise [subcommand]
 
-Help can be accessed via ``anoise -h`` or ``anoise subcommand -h``.
+Help can be accessed via ``anoise -h`` or ``anoise <subcommand> -h``.
 
 For our analyses, initial preprocessing is two steps:
 
