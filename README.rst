@@ -22,7 +22,9 @@ Installation
 
     curl -L https://github.com/fhcrc/ampliconnoise/tarball/master | tar xjf -
     cd fhcrc-ampliconnoise-*
-    sudo python2.7 setup.py install
+    python2.7 setup.py install  # may require sudo
+
+   See `Installing Python Modules`_ for more information and options.
 3. Build the AmpliconNoise binaries, and ensure they're present in your
    ``path``
 
@@ -95,5 +97,6 @@ location accessible from all.
 .. _Quince et al BMC Bioinformatics 2011: http://dx.doi.org/10.1186/1471-2105-12-38
 .. _Quince et al Nature Methods 2009: http://dx.doi.org/10.1038/nmeth.1361
 .. _Biopython: http://biopython.org/wiki/Main_Page
+.. _Installing Python Modules: http://docs.python.org/install/index.html
 
 .. [1] Note: the split step creates a child process for each sample.
