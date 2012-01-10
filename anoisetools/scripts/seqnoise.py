@@ -35,7 +35,7 @@ def main(arguments):
         arguments.stub = arguments.stub[:-10]
 
     snoise_stub = arguments.stub + '-snoise'
-    targets = [snoise_stub, snoise_stub + '_cd.fa', snoise_stub + '.mapping']
+    targets = [snoise_stub + '_cd.fa', snoise_stub + '.mapping']
 
     runner = run.NoiseRunner(targets, temp_base=arguments.temp_dir,
         mpi_flags=arguments.mpi_args)

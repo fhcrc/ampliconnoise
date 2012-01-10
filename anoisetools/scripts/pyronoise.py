@@ -45,7 +45,7 @@ def main(arguments):
                 os.path.splitext(arguments.sff_file)[0])
 
     pnoise_stub = arguments.stub + '-pnoise'
-    targets = [pnoise_stub, pnoise_stub + '_cd.fa', pnoise_stub + '.mapping']
+    targets = [pnoise_stub + '_cd.fa', pnoise_stub + '.mapping']
 
     runner = run.NoiseRunner(targets, temp_base=arguments.temp_dir,
         mpi_flags=arguments.mpi_args)
