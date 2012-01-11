@@ -29,4 +29,4 @@ def ambiguous_regex(sequence_str):
     """
     Convert an IUPAC ambiguous string to a regular expression
     """
-    return re.compile(ambiguous_pattern, re.IGNORECASE)
+    return re.compile(ambiguous_pattern(sequence_str), re.IGNORECASE)
