@@ -1,7 +1,11 @@
 import re
 import sys
 
+from Bio import SeqIO
+from Bio.SeqIO.FastaIO import FastaWriter
+
 from anoisetools.util import ambiguous_pattern
+
 
 def build_parser(subparsers):
     """
@@ -25,31 +29,28 @@ def trim(barcode, length, in_handle, out_handle):
 
     Trims barcodes from FASTA-formatted sequences in in_handle, truncates
     sequences at provided length, writes to out_handle.
-
-    Note:
-    Sequences passed must be on a single line.
     """
+    def inner(sequences, pattern):
+        "Does the trimming"
+        for sequence in sequences:
+            s = str(sequence.seq)
+            m = pattern.match(s)
+            if m:
+                yield sequence[m.end():length]
+            else:
+                print >> sys.stderr, "No match:", sequence.id
+                yield sequence[:length]
+
     # Records are read TCAG, we trim the first 4 *flows*, which won't
     # detect duplicate G's.
     barcode = barcode.lstrip('G')
-    lines = (line.rstrip() for line in in_handle)
 
-    pattern = re.compile('{0}(.*)'.format(barcode))
+    pattern = re.compile('^{0}'.format(barcode))
 
+    sequences = SeqIO.parse(in_handle, 'fasta')
 
-
-    for line in lines:
-        if line.startswith('>'):
-            # Fasta header
-            print >> out_handle, line
-        else:
-            m = pattern.match(line)
-
-            if m:
-                line = m.group(1)
-
-            print >> out_handle, line[:length]
-
+    trimmed = inner(sequences, pattern)
+    FastaWriter(out_handle, wrap=None).write_file(trimmed)
 
 def main(parsed):
     """
