@@ -1,22 +1,21 @@
 """
 Split input FASTA files
 """
-
 import argparse
 import collections
 import csv
 import errno
 import json
 import logging
-import multiprocessing
-import os
 import os.path
-import Queue
 import sys
+import threading
+from Queue import Queue, Empty
 
 from Bio import SeqIO
 
 from anoisetools.util import ambiguous_regex
+
 
 _WriterTuple = collections.namedtuple('WriterTuple',
         ['queue', 'writer', 'process'])
@@ -35,7 +34,7 @@ class SequenceWriter(object):
 
     def __init__(self, queue, path, sequence_format, barcode=None,
             primer=None):
-        self.count = multiprocessing.Value('i', 0)
+        self.count = 0
         self.queue = queue
         self.path = path
         self.sequence_format = sequence_format
@@ -58,9 +57,9 @@ class SequenceWriter(object):
                 # None sent as a sentinal value for completed job
                 if record is None:
                     break
-                self.count.value += 1
+                self.count += 1
                 yield record
-            except Queue.Empty:
+            except Empty:
                 pass
 
     def write(self):
@@ -82,7 +81,7 @@ class SequenceWriter(object):
              'barcode': self.barcode,
              'sequence_file': os.path.basename(self.path),
              'output_format': self.sequence_format,
-             'sequence_count': self.count.value}
+             'sequence_count': self.count}
 
         with open(control_path, 'w') as fp:
             json.dump(d, fp, indent=2)
@@ -172,15 +171,16 @@ class SequenceSplitter(object):
                                  self.unmatched_name))
 
         for barcode, primer, path, name in writer_templates:
-            queue = multiprocessing.Queue()
+            queue = Queue()
             writer = SequenceWriter(queue, path, self.output_format,
                     barcode=barcode, primer=primer)
 
             # Create a process to write output records
-            process = multiprocessing.Process(target=writer.write)
-            process.start()
+            thread = threading.Thread(target=writer.write)
+            thread.daemon = True
+            thread.start()
             self._output_files[barcode, primer] = \
-                _WriterTuple(queue, writer, process)
+                _WriterTuple(queue, writer, thread)
 
     @property
     def _default_queue(self):
@@ -244,7 +244,7 @@ class SequenceSplitter(object):
                 writer.write_control()
 
 
-        return [(i.writer.path, i.writer.count.value) for i in
+        return [(i.writer.path, i.writer.count) for i in
                 self._output_files.values()]
 
 def build_parser(subparsers):
