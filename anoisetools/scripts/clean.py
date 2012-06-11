@@ -151,7 +151,9 @@ class FlowgramFilter(object):
 
     def filter_records(self, records):
         for record in records:
-            flows = record.annotations['flow_values'][:record.annotations['clip_qual_right']]
+            a = record.annotations
+            clip_right = a['clip_flow_right']
+            flows = a['flow_values'][:clip_right]
             flows = [float(i) / 100 for i in flows]
             flows = self.filter_record(flows)
             trimmed_reading = sff.flow_to_seq(flows)

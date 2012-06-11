@@ -6,8 +6,8 @@ from anoisetools.scripts import truncate
 class TrimTestCase(unittest.TestCase):
 
     def setUp(self):
-        self.input = iter('''>GYUL5KN02IY0NH qclip: 5..519
-CGATCTAAGTTCATAACCCATCCAAGGAATGGAGGTTCTTTCTGATGCTTTTTGTCTGGTGTAGTGAATCCCCAGCTCAATAGGTGAGCT'''.splitlines())
+        self.input = StringIO('''>GYUL5KN02IY0NH qclip: 5..519
+CGATCTAAGTTCATAACCCATCCAAGGAATGGAGGTTCTTTCTGATGCTTTTTGTCTGGTGTAGTGAATCCCCAGCTCAATAGGTGAGCT''')
         self.barcode = 'GCGATCT'
         self.output = StringIO()
 
@@ -22,5 +22,5 @@ CGATCTAAGTTCATAACCCATCCAAGGAATGGAGGTTCTTTCTGATGCTTTTTGTCTGGTGTAGTGAATCCCCAGCTCAA
     def test_expected_full(self):
         truncate.trim(self.barcode, 20, self.input, self.output)
         self.assertEquals('''>GYUL5KN02IY0NH qclip: 5..519
-AAGTTCATAACCCATCCAAG\n''', self._value)
+AAGTTCATAACCCA\n''', self._value)
 

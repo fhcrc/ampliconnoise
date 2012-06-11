@@ -43,7 +43,7 @@ class AnoiseRawReader(object):
             record = SeqRecord(sequence, id=header)
             # Add flows and clip as annotations
             record.annotations['flow_values'] = [int(i * 100) for i in flows]
-            record.annotations['clip_qual_right'] = flow_length
+            record.annotations['clip_flow_right'] = flow_length
             yield record
 
 
@@ -53,9 +53,10 @@ def _record_to_anoise_raw(seq_record):
     consisting of the identifier, a newline, the integer length of the
     flow, a space, and the float flow readings.
     """
+    l, r = sff.find_clip(seq_record)
     return '>{identifier}\n{length} {flow}'.format(
             identifier=seq_record.id,
-            length=seq_record.annotations['clip_qual_right'],
+            length=r,
             flow=sff.flows_to_string(seq_record))
 
 

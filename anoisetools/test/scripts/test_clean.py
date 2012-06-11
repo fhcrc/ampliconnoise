@@ -2,10 +2,14 @@
 Tests for clean.py
 """
 
-import re
+import glob
+import os
+import os.path
+import tempfile
 import unittest
 
-from anoisetools.scripts import clean
+
+from anoisetools.scripts import clean, dispatch
 
 
 class TestFlowgramValid(unittest.TestCase):
@@ -100,4 +104,27 @@ class TestHandleRecord(unittest.TestCase):
         # TODO: Expand
 
 
-# TODO: Compare to perl
+
+def data_path(*args):
+    return os.path.join(os.path.dirname(__file__), '..', 'data', *args)
+
+class CleanTestCase(unittest.TestCase):
+    def setUp(self):
+        self.dat_path = data_path('test.anoise.dat')
+        self.raw_path = data_path('test.raw')
+        with open(self.dat_path) as fp:
+            self.expected = list(fp)
+
+    def test_run(self):
+        with tempfile.NamedTemporaryFile(prefix='anoise') as fp:
+            args = ['clean', 'CAGGGAGCTGGAAAGATT.GC', fp.name, '--input', self.raw_path]
+            try:
+                dispatch.main(args)
+                with open(fp.name + '.dat') as dat_fp:
+                    actual = list(dat_fp)
+                self.assertEqual(len(self.expected), len(actual))
+                for i, j in zip(self.expected, actual):
+                    self.assertEqual(i.strip(), j.strip())
+            finally:
+                for f in glob.iglob(fp.name + '.*'):
+                    os.remove(f)

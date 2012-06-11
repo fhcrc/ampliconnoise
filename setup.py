@@ -7,7 +7,7 @@ except ImportError:
     from setuptools import setup, find_packages
 
 setup(name='anoisetools',
-      version='0.2',
+      version='0.3',
       author='Connor McCoy',
       author_email='cmccoy@fhcrc.org',
       packages=find_packages(),

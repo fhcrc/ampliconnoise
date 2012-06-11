@@ -41,7 +41,7 @@ def main(parsed):
     if not parsed.outfile:
         noext = os.path.splitext(parsed.infile.name)[0]
         outfile_path = noext + '.raw'
-        parsed.outfile = open(outfile_path)
+        parsed.outfile = open(outfile_path, 'w')
     with parsed.infile:
         with parsed.outfile:
             sff_to_raw(parsed.infile, parsed.outfile)
