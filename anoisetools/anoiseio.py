@@ -1,6 +1,9 @@
 """
 Tools for reading Ampliconnoise outputs
 """
+import itertools
+import os.path
+import re
 import shutil
 import tempfile
 
@@ -113,3 +116,36 @@ class AnoiseRawWriter(object):
         finally:
             self._temp.close()
             self._fp.close()
+
+def _read_count(read_name):
+    m = re.search(r'noise_\d+_(\d+)$', read_name)
+    if m:
+        return int(m.group(1))
+    return 1
+
+def read_mapping(fp):
+    """
+    Read an ampliconnoise .mapping file
+    """
+    # Base name
+    bp = os.path.splitext(os.path.basename(fp.name))[0]
+
+    indexes = itertools.count()
+
+    lines = (i.strip() for i in fp)
+    for line in lines:
+        used_sequence, seqs = line.split(None, 1)
+        seqs = seqs.split(',')
+        total_weight = sum(_read_count(i) for i in seqs)
+        read_name = '{0}_{1}_{2}'.format(bp, next(indexes), total_weight)
+        yield read_name, seqs
+
+def merge_mapping(snoise_map, pnoise_map):
+    """
+    Merge two mapping files, from SeqNoise and PyroNoise, ending with a mapping
+    from seqnoise_id -> list of original sequence ids
+    """
+    pnoise_map = dict(pnoise_map)
+    for i, seqs in snoise_map:
+        orig_seqs = [o for s in seqs for o in pnoise_map[s]]
+        yield i, orig_seqs
