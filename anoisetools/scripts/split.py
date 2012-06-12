@@ -87,6 +87,7 @@ class SequenceWriter(object):
             json.dump(d, fp, indent=2)
             fp.write('\n')
 
+
 def load_barcodes(fp):
     d = collections.defaultdict(list)
     def vals():
@@ -96,6 +97,9 @@ def load_barcodes(fp):
         name, barcode, primer = record[:3]
         if name in vals():
             raise ValueError("Duplicate value: {0}".format(name))
+        if barcode in d and primer in [i.pattern for i, _ in d[barcode]]:
+            raise ValueError("Duplicate barcode/primer combination: " +
+                    "{0} {1}".format(barcode, primer))
         d[barcode].append((ambiguous_regex(primer), name))
 
     return d
