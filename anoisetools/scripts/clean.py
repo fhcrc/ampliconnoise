@@ -17,6 +17,7 @@ Per Quince et al, 2011,
 """
 
 import argparse
+import math
 import re
 import shutil
 import sys
@@ -153,21 +154,25 @@ class FlowgramFilter(object):
         for record in records:
             a = record.annotations
             clip_right = a['clip_flow_right']
-            flows = a['flow_values'][:clip_right]
-            flows = [float(i) / 100 for i in flows]
-            flows = self.filter_record(flows)
-            trimmed_reading = sff.flow_to_seq(flows)
+            flows = a['flow_values']
+            flows = [float(i) / 100.0 for  i in flows]
+            trim_flows = flows[:clip_right]
+            trim_flows = self.filter_record(trim_flows)
+            trimmed_reading = sff.flow_to_seq(trim_flows)
 
             m = self.primer_re.match(trimmed_reading)
-            if (self.min_flows is None or len(flows) >= self.min_flows) and m:
+            if (self.min_flows is None or len(trim_flows) >= self.min_flows) and m:
                 sequence = m.group(1)
 
                 # Truncate the flow result to a maximum length
                 # Note that the FASTA result is unchanged
-                flow_result = flows[:self.max_flows]
+                flow_result = trim_flows[:self.max_flows]
+
+                # AmpliconNoise reports flowgram lengths to the nearest power of 4
+                trim_len = int(math.ceil(len(flow_result) / 4.0)) * 4
 
                 self.passed += 1
-                yield (record.id, sequence, flow_result)
+                yield (record.id, sequence, trim_len, flows[:self.max_flows])
             else:
                 self.failed += 1
 
@@ -187,13 +192,13 @@ def invoke(reader, fa_handle, dat_path, primer, min_flows, max_flows,
     # On the first pass, write to a temporary file: we'll need to include the
     # record count and maximum length at the beginning of the file later.
     with tempfile.TemporaryFile() as dat_handle:
-        for identifier, sequence, flows in cleaned_iter:
+        for identifier, sequence, trim_len, flows in cleaned_iter:
             # Write FASTA
             print >> fa_handle, '>{0}\n{1}'.format(identifier,
                                                    sequence)
             # Write data
-            print >> dat_handle, identifier, len(flows),
-            print >> dat_handle, ' '.join(map('{:.2f}'.format, flows))
+            dat_handle.write('{0} {1} {2}\n'.format(
+                identifier, trim_len, ' '.join(map('{:.2f}'.format, flows))))
 
         print dat_path, '{0} passed; {1} failed'.format(flowgram_filter.passed,
                 flowgram_filter.failed)

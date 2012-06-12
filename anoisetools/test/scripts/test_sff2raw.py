@@ -4,10 +4,7 @@ import unittest
 import tempfile
 
 from anoisetools.scripts import sff2raw
-
-def data_path(*args):
-    dn = os.path.dirname(__file__)
-    return os.path.join(dn, '..', 'data', *args)
+from anoisetools.test.scripts import data_path
 
 class Sff2RawTestCase(unittest.TestCase):
 

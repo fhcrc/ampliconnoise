@@ -34,8 +34,9 @@ class SplitKeysReaderTestCase(unittest.TestCase):
 
         record0 = records[0]
         self.assertEquals('GYUL5KN01A46DL', record0.id)
-        self.assertEquals([99, 2, 109, 7],
+        self.assertEquals([99, 2, 109, 7, 6],
                           record0.annotations['flow_values'])
+        self.assertEquals(4, record0.annotations['clip_flow_right'])
 
 class AnoiseRecordConverterTestCase(unittest.TestCase):
 

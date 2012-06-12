@@ -36,7 +36,7 @@ class AnoiseRawReader(object):
             header = next(self._fp)[1:]
             split_line = next(self._fp).split()
             flow_length = int(split_line[0])
-            flows = split_line[1:flow_length + 1]
+            flows = split_line[1:]
             flows = map(float, flows)
             bases = sff.flow_to_seq(flows)
             sequence = Seq(bases, generic_dna)
