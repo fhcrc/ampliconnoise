@@ -14,9 +14,9 @@ my %keys = {};
 my $count = 0;
 my $fileName = 0;
 
-my $primer  = $ARGV[0]; 
+my $primer  = &translateIUPAC($ARGV[0]); 
 my $keyFile = $ARGV[1];
-
+my @names = ();
 open(FILE, "$keyFile") or die;
 
 while($line = <FILE>){
@@ -36,19 +36,28 @@ while($line = <FILE>){
     print $fh "$count $tag $fileName\n";
 
     $keys{$tag} = $fh;
-
+    push(@names,$fileName);
     #close($fh);
 
     $count++;
 }
 close(FILE);
 
-my $flowSeq = "TACG";
-
+my $flowSeq = "";
+my $keySeq = "";
 
 while(my $line = <STDIN>){
     chomp($line);
  
+    if($line =~ /Flow Chars:\s+([ACTG]+)/){
+	$flowSeq = $1;
+    }
+
+    if($line =~ /Key Sequence:\s+([ACTG]+)/){
+        $keySeq = $1;
+
+    }
+
     if($line =~ /\# of Reads:\s+(\d+)/){
 	$nReads = $1;
     }
@@ -118,7 +127,8 @@ while(my $line = <STDIN>){
 
 	my $read = flowToSeq($length,@{$flowRef});
 	#print "$bGood $read\n";
-	if($bGood == 1 && $read =~ /^TCAG(\w*)$primer.*$/){
+	if($bGood == 1 && $read =~ /^${keySeq}(\w*)$primer.*$/){
+
 	    my $tag = $1;
 	    if($keys{$tag} ne undef){
 		my $fh = $keys{$tag};
@@ -142,11 +152,32 @@ my $total = 0;
 foreach $key (keys %counts){
     my $count = $counts{$key};
     if($count > 0){
+	my $fh = $keys{$key};
+	close($fh);
 	print "$key $count\n";
 	$total += $count;
     }
 }
 print "$nReads $total\n";
+
+
+foreach $name(@names){
+
+	open my $in,  '<',  $name      or die "Can't read old file: $!";
+	open my $out, '>', "$name.new" or die "Can't write new file: $!";
+
+	print $out "$keySeq $flowSeq\n";
+
+	while( <$in> )
+	{     
+    		print $out $_;
+	}
+
+	close $out;
+
+	rename("$name.new", $name);
+}
+
 
 sub flowToSeq()
 {
@@ -155,7 +186,7 @@ sub flowToSeq()
 
     for(my $i = 0; $i < $length; $i++){
 	my $signal = floor($flowgram[$i] + 0.5);
-	my $base   = substr($flowSeq, $i % 4, 1);
+	my $base   = substr($flowSeq, $i, 1);
 
 	for(my $j = 0; $j < $signal; $j++){
 	    $retSeq .= $base;
@@ -163,4 +194,22 @@ sub flowToSeq()
     }
 
     return $retSeq;
+}
+
+sub translateIUPAC()
+{
+  my ($seq) = @_;
+
+  $seq=~s/W/\[AT\]/g;
+  $seq=~s/B/\[CGT\]/g;
+  $seq=~s/S/\[GC\]/g;  
+  $seq=~s/N/\[ACTG\]/g;
+  $seq=~s/Y/\[CT\]/g;
+  $seq=~s/R/\[AG\]/g;
+  $seq=~s/D/\[AGT\]/g;
+  $seq=~s/H/\[ACT\]/g;
+  $seq=~s/M/\[AC\]/g;
+  $seq=~s/K/\[GT\]/g;
+  $seq=~s/V/\[ACG\]/g;
+  return $seq;
 }

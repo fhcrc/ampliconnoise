@@ -9,6 +9,7 @@
 #include <string.h>
 #include <math.h>
 
+
 #include "FCluster.h"
 
 static char *usage[] = {"FCluster\n",
@@ -22,6 +23,16 @@ static char *usage[] = {"FCluster\n",
                         "-s                       scale dist.\n"};
 
 static int nLines = 9;
+
+// Holds a minimum distance for a given cluster and the id of the node
+// Is used to store the nearest neighbour for each node
+// This is done to reduce the time spent in getClosest from O(N3) to O(N2)
+struct t_Min
+{
+  float minDist;       
+  int indexOfMinNode;  
+  int reCalc;          // flag to indicate if the values need to be recalculated
+};
 
 int main(int argc, char* argv[])
 {
@@ -58,7 +69,7 @@ int main(int argc, char* argv[])
     }
   }
   sprintf(szTreeFile, "%s%s", tParams.szOutFileStub, TREE_SUFFIX);
-
+  
   ofp = fopen(szTreeFile, "w");
 
   if(ofp){
@@ -70,8 +81,10 @@ int main(int argc, char* argv[])
     fprintf(stderr, "Failed to open %s for writing\n", szTreeFile);
     fflush(stderr);
   }
-  outputCluster(&tParams, atTree, aszID, nN);
+  
 
+  outputCluster(&tParams, atTree, aszID, nN);
+  
   /*free up memory*/
   free(atTree);
   for(i = 0; i < nN; i++){
@@ -183,25 +196,109 @@ void getCommandLineParams(t_Params *ptParams,int argc,char *argv[])
   exit(EXIT_FAILURE);
 }
 
-float getClosest(int nN, float** aafDistMatrix, int* nI, int* nJ)
+// Update the cached min data when a new value is pushed into aafDistMatrix
+void UpdateMinCacheWithNewValue(struct t_Min* asMin,int i,int j,float** aafDistMatrix)
+{
+    if( aafDistMatrix[i][j] < asMin[i].minDist)
+    {
+        asMin[i].minDist = aafDistMatrix[i][j];
+        asMin[i].indexOfMinNode = j;
+    }
+    if(aafDistMatrix[i][j] == asMin[i].minDist && j < asMin[i].indexOfMinNode)
+    {
+        // if two points have same distance then the earlier one is the designated min
+        // this is for backward compatibility with the pre-optimised algorithm
+        asMin[i].indexOfMinNode = j;
+    }
+    else if( j == asMin[i].indexOfMinNode )
+    {
+        // flag that this row needs to re-calculated
+        // do that at the end to prevent it being done several times when it
+        // need only be done once
+        asMin[i].reCalc = 1; 
+    }
+};
+
+// Recalculate cached data for all rows
+UpdateMinCacheForMarkedRows(struct t_Min* asMin,float** aafDistMatrix,int nN)
+{
+    int i;
+    for (i = 1; i < nN; i++)
+    {
+        if( asMin[i].reCalc == 1)
+        {
+            UpdateMinCacheForRow(asMin,i,aafDistMatrix);
+        }
+        asMin[i].reCalc = 0;
+    } 
+};
+
+// Update the cached data for a row 
+UpdateMinCacheForRow(struct t_Min* asMin,int i,float** aafDistMatrix)
+{
+        // re-calculate the whole row as the old min has been overwritten
+        float fdist = aafDistMatrix[i][0];
+        float ftemp;
+        int nj=0;
+        int jj;
+        for(jj=1;jj<i;jj++)
+        {
+            ftemp = aafDistMatrix[i][jj];
+            if( ftemp < fdist)
+            {
+                fdist = ftemp;
+                nj = jj;
+            }
+        }
+        asMin[i].minDist = fdist;
+        asMin[i].indexOfMinNode = nj;    
+};
+
+// Initialise min cache per group
+void InitMinCacheData(int nN, struct t_Min* asMin, float** aafDistMatrix)
 { 
-  int i, j;
+  int i, j, nj;
   float  fTemp;
-  float  fDist = aafDistMatrix[1][0];
-  *nI = 1;
-  *nJ = 0;
+  
   for (i = 1; i < nN; i++){ 
+    float  fDist = aafDistMatrix[i][0];
+    nj=0;
     for (j = 0; j < i; j++){ 
       fTemp = aafDistMatrix[i][j];
       
       if(fTemp < fDist){ 
 	fDist = fTemp;
-        *nI = i;
-        *nJ = j;
+        nj = j;
       }
-    }
+    }    
+    asMin[i].minDist = fDist;
+    asMin[i].indexOfMinNode = nj;
+    asMin[i].reCalc = 0; 
   }
+}
 
+
+// find closest groups using cached group data
+float getClosest(int nN, struct t_Min* asMin, int* nI, int* nJ)
+{ 
+  int i, j;
+  float  fTemp;
+  
+  // prime the search with the first value in queue
+  float  fDist = asMin[1].minDist;
+  *nI = 1;
+  *nJ = asMin[1].indexOfMinNode;
+  
+  // search over remaining items in queue
+  for (i = 1; i < nN; i++){ 
+      fTemp = asMin[i].minDist;
+      
+      if(fTemp < fDist){ 
+	fDist = fTemp;
+        *nI = i;
+        *nJ = asMin[i].indexOfMinNode;
+      }
+  }
   return fDist;
 }
 
@@ -363,7 +460,8 @@ t_Node* MaxCluster(int nE, float** aafDistMatrix)
   int n;
   int* anCI;
   t_Node* atResult;
-
+  struct t_Min *asMin;
+  
   anCI = malloc(nE*sizeof(int));
   if(!anCI) return NULL;
   atResult = malloc((nE-1)*sizeof(t_Node));
@@ -372,24 +470,55 @@ t_Node* MaxCluster(int nE, float** aafDistMatrix)
     return NULL;
   }
 
+  // allocate min cache
+  asMin = malloc((nE)*sizeof(struct t_Min));
+  if(!asMin)
+  {
+      free(anCI);
+      free(atResult);
+      return NULL;
+  }
+
+  
   for (j = 0; j < nE; j++) anCI[j] = j;
+    // initialise the min cached info
+    InitMinCacheData(nE,asMin,aafDistMatrix);
 
   for (n = nE; n > 1; n--)
   { 
     int is = 1;
     int js = 0;
-    atResult[nE-n].distance = getClosest(n, aafDistMatrix, &is, &js);
-
+    
+    atResult[nE-n].distance = getClosest(n, asMin, &is, &js);
+    
     for (j = 0; j < js; j++)
+    {
       aafDistMatrix[js][j] = max(aafDistMatrix[is][j],aafDistMatrix[js][j]);
+      UpdateMinCacheWithNewValue(asMin,js,j,aafDistMatrix);
+    }
     for (j = js+1; j < is; j++)
-      aafDistMatrix[j][js] = max(aafDistMatrix[is][j],aafDistMatrix[j][js]);
+    {  
+        aafDistMatrix[j][js] = max(aafDistMatrix[is][j],aafDistMatrix[j][js]);
+        UpdateMinCacheWithNewValue(asMin,j,js,aafDistMatrix);
+    }
     for (j = is+1; j < n; j++)
+    {
       aafDistMatrix[j][js] = max(aafDistMatrix[j][is],aafDistMatrix[j][js]);
-
-    for (j = 0; j < is; j++) aafDistMatrix[is][j] = aafDistMatrix[n-1][j];
-    for (j = is+1; j < n-1; j++) aafDistMatrix[j][is] = aafDistMatrix[n-1][j];
-
+      UpdateMinCacheWithNewValue(asMin,j,js,aafDistMatrix);
+    }
+    for (j = 0; j < is; j++)
+    {
+        aafDistMatrix[is][j] = aafDistMatrix[n-1][j];
+        UpdateMinCacheWithNewValue(asMin,is,j,aafDistMatrix);
+    }
+    for (j = is+1; j < n-1; j++)
+    {
+        aafDistMatrix[j][is] = aafDistMatrix[n-1][j];
+        UpdateMinCacheWithNewValue(asMin,j,is,aafDistMatrix);
+    }
+    // Update any rows were the min cache is no longer valid
+    UpdateMinCacheForMarkedRows(asMin,aafDistMatrix,n);
+    
     atResult[nE-n].left = anCI[is];
     atResult[nE-n].right = anCI[js];
     anCI[js] = n-nE-1;
@@ -400,6 +529,7 @@ t_Node* MaxCluster(int nE, float** aafDistMatrix)
     }
   }
   free(anCI);
+  free(asMin);
   printf("\n"); fflush(stdout);
   return atResult;
 }
@@ -411,7 +541,8 @@ t_Node* AvCluster(int nE, float** aafDistMatrix)
   int* anCI;
   int* anNumber;
   t_Node* atResult;
-
+  struct t_Min *asMin;
+  
   anCI = malloc(nE*sizeof(int));
   if(!anCI) return NULL;
   anNumber = malloc(nE*sizeof(int));
@@ -427,20 +558,32 @@ t_Node* AvCluster(int nE, float** aafDistMatrix)
     free(anNumber);
     return NULL;
   }
-
+  // allocate min cache
+  asMin = malloc((nE)*sizeof(struct t_Min));
+  if(!asMin)
+  {
+      free(anCI);
+      free(anNumber);
+      free(atResult);
+      return NULL;
+  }
+  
   for (j = 0; j < nE; j++)
   { 
     anNumber[j] = 1;
     anCI[j] = j;
   }
-
+  
+  // initialise the min cache
+  InitMinCacheData(nE,asMin,aafDistMatrix);
+  
   for (n = nE; n > 1; n--)
   { 
     int nSum;
     int is = 1;
     int js = 0;
-    
-    atResult[nE-n].distance = getClosest(n, aafDistMatrix, &is, &js);
+
+    atResult[nE-n].distance = getClosest(n, asMin, &is, &js);
 
     atResult[nE-n].left = anCI[is];
     atResult[nE-n].right = anCI[js];
@@ -452,24 +595,34 @@ t_Node* AvCluster(int nE, float** aafDistMatrix)
       aafDistMatrix[js][j] = aafDistMatrix[is][j]*anNumber[is]
                         + aafDistMatrix[js][j]*anNumber[js];
       aafDistMatrix[js][j] /= nSum;
+      UpdateMinCacheWithNewValue(asMin,js,j,aafDistMatrix);
     }
-    
     for (j = js+1; j < is; j++)
     { 
       aafDistMatrix[j][js] = aafDistMatrix[is][j]*anNumber[is]
                         + aafDistMatrix[j][js]*anNumber[js];
       aafDistMatrix[j][js] /= nSum;
+      UpdateMinCacheWithNewValue(asMin,j,js,aafDistMatrix);
     }
-    
     for (j = is+1; j < n; j++)
     { 
       aafDistMatrix[j][js] = aafDistMatrix[j][is]*anNumber[is]
                         + aafDistMatrix[j][js]*anNumber[js];
       aafDistMatrix[j][js] /= nSum;
+      UpdateMinCacheWithNewValue(asMin,j,js,aafDistMatrix);
     }
-
-    for (j = 0; j < is; j++) aafDistMatrix[is][j] = aafDistMatrix[n-1][j];
-    for (j = is+1; j < n-1; j++) aafDistMatrix[j][is] = aafDistMatrix[n-1][j];
+    for (j = 0; j < is; j++)
+    {
+        aafDistMatrix[is][j] = aafDistMatrix[n-1][j];
+        UpdateMinCacheWithNewValue(asMin,is,j,aafDistMatrix);
+    }
+    for (j = is+1; j < n-1; j++)
+    {
+        aafDistMatrix[j][is] = aafDistMatrix[n-1][j];
+        UpdateMinCacheWithNewValue(asMin,j,is,aafDistMatrix);
+    }
+    // Recalculate min cache for marked rows 
+    UpdateMinCacheForMarkedRows(asMin,aafDistMatrix,n);
 
     anNumber[js] = nSum;
     anNumber[is] = anNumber[n-1];
@@ -477,20 +630,25 @@ t_Node* AvCluster(int nE, float** aafDistMatrix)
     anCI[js] = n-nE-1;
     anCI[is] = anCI[n-1];
   }
+  
   free(anCI);
   free(anNumber);
+  free(asMin);
 
   return atResult;
 }
 
 t_Node* AvClusterW(int nE, float** aafDistMatrix, float* afW)
 { 
+  // initialise variables
   int j;
   int n;
   int* anCI;
   float* afNumber;
   t_Node* atResult;
-
+  struct t_Min *asMin;
+  
+  // allocate variables ...
   anCI = malloc(nE*sizeof(int));
   
   if(!anCI) return NULL;
@@ -504,26 +662,41 @@ t_Node* AvClusterW(int nE, float** aafDistMatrix, float* afW)
   }
   
   atResult = malloc((nE-1)*sizeof(t_Node));
-  
+    
   if (!atResult)
   { 
     free(anCI);
     free(afNumber);
     return NULL;
   }
-
+  
+  // allocate min cache
+  asMin = malloc((nE)*sizeof(struct t_Min));
+  if(!asMin)
+  {
+      free(anCI);
+      free(afNumber);
+      free(atResult);
+      return NULL;
+  }
+  
   for (j = 0; j < nE; j++)
   { afNumber[j] = afW[j];
     anCI[j] = j;
   }
 
+  // initialise the min cache
+  InitMinCacheData(nE,asMin,aafDistMatrix);
+    
   for (n = nE; n > 1; n--)
   { 
     float fSum;
     int is = 1;
     int js = 0;
     
-    atResult[nE-n].distance = getClosest(n, aafDistMatrix, &is, &js);
+    is = 1;
+    js = 0;
+    atResult[nE-n].distance = getClosest(n, asMin, &is, &js);
     atResult[nE-n].left = anCI[is];
     atResult[nE-n].right = anCI[js];
 
@@ -534,33 +707,45 @@ t_Node* AvClusterW(int nE, float** aafDistMatrix, float* afW)
       aafDistMatrix[js][j] = aafDistMatrix[is][j]*afNumber[is]
                         + aafDistMatrix[js][j]*afNumber[js];
       aafDistMatrix[js][j] /= fSum;
+      UpdateMinCacheWithNewValue(asMin,js,j,aafDistMatrix);
     }
-    
     for (j = js+1; j < is; j++)
     { 
       aafDistMatrix[j][js] = aafDistMatrix[is][j]*afNumber[is]
                         + aafDistMatrix[j][js]*afNumber[js];
       aafDistMatrix[j][js] /= fSum;
+      UpdateMinCacheWithNewValue(asMin,j,js,aafDistMatrix);
     }
-    
     for (j = is+1; j < n; j++)
     { 
       aafDistMatrix[j][js] = aafDistMatrix[j][is]*afNumber[is]
                         + aafDistMatrix[j][js]*afNumber[js];
       aafDistMatrix[j][js] /= fSum;
+      UpdateMinCacheWithNewValue(asMin,j,js,aafDistMatrix);
     }
-
-    for (j = 0; j < is; j++) aafDistMatrix[is][j] = aafDistMatrix[n-1][j];
-    for (j = is+1; j < n-1; j++) aafDistMatrix[j][is] = aafDistMatrix[n-1][j];
-
+    for (j = 0; j < is; j++)
+    { 
+        aafDistMatrix[is][j] = aafDistMatrix[n-1][j];
+        UpdateMinCacheWithNewValue(asMin,is,j,aafDistMatrix);
+    }
+    for (j = is+1; j < n-1; j++)
+    {
+        aafDistMatrix[j][is] = aafDistMatrix[n-1][j];
+        UpdateMinCacheWithNewValue(asMin,j,is,aafDistMatrix);
+    }
+    // Update marked rows in min cache
+    UpdateMinCacheForMarkedRows(asMin,aafDistMatrix,n);
+   
     afNumber[js] = fSum;
     afNumber[is] = afNumber[n-1];
 
     anCI[js] = n-nE-1;
     anCI[is] = anCI[n-1];
+    
   }
   free(anCI);
   free(afNumber);
+  free(asMin);
 
   return atResult;
 }

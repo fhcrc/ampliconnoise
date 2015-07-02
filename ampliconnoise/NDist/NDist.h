@@ -1,3 +1,9 @@
+/*
+August 2012 Code has been optimised for speed by Tessella, funded by Unilever.
+See comments in code for details of optimisation changes.
+Output has been verified to be unaffected by these changes.
+*/
+
 #ifndef NDIST_MPI_H
 #define NDIST_MPI_H
 
@@ -52,8 +58,23 @@ typedef struct s_Data
 #ifndef min
 #define min(x, y)	((x) < (y) ? (x) : (y))
 #endif
+
 #ifndef max
 #define	max(x, y)	((x) > (y) ? (x) : (y))
+#endif
+
+/* August 2012
+   Speed optimisation 5B: inline loop functions */
+#ifndef dist
+#define	dist(a, b)	((a) == (b) ? 0 : 1)
+#endif
+
+#ifndef getMove
+#define	getMove(a, b, c)	((a) < (b) ? ((a) >= (c) ? UP : DIAG) : ((b) < (c) ? LEFT : UP))
+#endif
+
+#ifndef dmin3
+#define dmin3(a, b, c)	((a) < (b) ? ((c) < (a) ? (c) : (a)) : ((c) < (b) ? (c) : (b)))
 #endif
 
 /* User defined structures */
@@ -81,6 +102,6 @@ void readData(t_Data *ptData, t_Params *ptParams);
 
 void getCommandLineParams(t_Params *ptParams,int argc,char *argv[]);
 
-void needlemanWunsch(t_Align *ptAlign, const char* acA, const char* acB, int nLenA, int nLenB);
+void needlemanWunsch(t_Align *ptAlign, const char* acA, const char* acB, int nLenA, int nLenB, double** aadFMatrix, int** aanMoves);
 
 #endif

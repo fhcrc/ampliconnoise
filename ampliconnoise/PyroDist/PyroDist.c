@@ -444,7 +444,7 @@ void readData(double *adLookUp, char* szDataFile, t_Flows* ptFlows, t_Params *pt
     
       nE = anLengths[i] % 4;
       anLengths[i] -= nE;
-      //      printf("%d %d %d\n",anLengths[i], nE, nM);
+          printf("%d %d %d %d\n",i, anLengths[i], nE, nM);
       for(j = 0; j < anLengths[i]; j++){
 	double dF = 0.0;
 

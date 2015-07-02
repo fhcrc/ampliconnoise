@@ -98,6 +98,8 @@ close $out;
 
 rename("$dfile.new", $dfile);
 
+exit(0);
+
 sub flowToSeq()
 {
     my ($length, @flowgram) = @_;

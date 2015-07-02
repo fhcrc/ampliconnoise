@@ -1,3 +1,9 @@
+/*
+August 2012 Code has been optimised for speed by Tessella, funded by Unilever.
+See comments in code for details of optimisation changes.
+Output has been verified to be unaffected by these changes.
+*/
+
 /**System includes****/
 #include <stdio.h>
 #include <stdlib.h>
@@ -72,6 +78,8 @@ int main(int argc, char* argv[]){
   unsigned long   ulNumTasks, ulOffset, ulA, ulA0, ulSize, ulCount, ulStart, ulFinish; 
   int    nTag = 1;
   unsigned long   ulPackets = 0, ulPacketSize = 0, ulPacketCurr = 0;
+  double **aadFMatrix = NULL;
+  int    **aanMoves   = NULL;
   MPI_Status   status;
 
   fflush(stdout);
@@ -91,7 +99,7 @@ int main(int argc, char* argv[]){
   fflush(stdout);
 
   if(rank == 0){ /*head node reads data*/
-    
+
     //fprintf(stdout, "%d read data\n",rank); fflush(stdout);
 
     readData(&tData, &tParams);
@@ -127,6 +135,32 @@ int main(int argc, char* argv[]){
 	printf("%s\n", tData.aszID[i]);
       }
     }
+    
+    /* Start 1A August 2012
+       Speed optimisation 1: allocate memory here once for the whole set of comparisons
+       We use the max sequence length to size the matrix and rely on each run of the needlemanWunsch algorithm to
+       initialise the values in the sub-set of the matrix space it will use
+       The change is repeated in head and slave node sections */
+    aadFMatrix = (double **) malloc((nM + 1)*sizeof(double *));
+    aanMoves   = (int **)    malloc((nM  + 1)*sizeof(int *));
+    if(!aadFMatrix || !aanMoves)
+      goto memoryError;
+    for(i = 0; i <= nM; i++){
+      aadFMatrix[i] = (double *)  malloc((nM + 1)*sizeof(double));
+      aanMoves[i]   = (int    *)  malloc((nM + 1)*sizeof(int));
+      if(!aadFMatrix[i] || !aanMoves[i])
+        goto memoryError;
+      
+      /* August 2012
+       Speed optimisation 3A: leave matrix empty initially except for edges*/
+      aadFMatrix[i][0] = GAP_PENALTY*i;
+      aanMoves[i][0] = UP; 
+      /* Because this master matrix is square, we can initialise the edges in 1 pass */
+      aadFMatrix[0][i] = GAP_PENALTY*i;
+      aanMoves[0][i] = LEFT;
+    }  
+    /* End 1A */
+    
     ulCount = 0;
     for(i = 0; i < nN; i++){
       for(j = 0; j < i; j++){
@@ -134,8 +168,7 @@ int main(int argc, char* argv[]){
 	double  dDist = 0.0;
 
 	needlemanWunsch(&tAlign, &tData.acSequences[i*nM], &tData.acSequences[j*nM], 
-			tData.anLen[i], tData.anLen[j]);
-
+			tData.anLen[i], tData.anLen[j], aadFMatrix, aanMoves);
 
 	dDist = tAlign.dDist;
 	printf("%.8e\n",dDist);
@@ -162,10 +195,10 @@ int main(int argc, char* argv[]){
 	else{
 	  ulPacketSize = ulA % MAX_PACKET_SIZE;
 	}
-	
+
 	MPI_Recv((void *) (&adDists[ulPacketCurr]), ulPacketSize, 
 		 MPI_DOUBLE, i, nTag, MPI_COMM_WORLD, &status);
-	
+
 	ulPacketCurr += ulPacketSize;
       }
       
@@ -174,7 +207,7 @@ int main(int argc, char* argv[]){
 	printf("%.8e\n",adDists[j]); 
       }
     }
-    
+
   }
   else{
     /* receive data*/
@@ -196,8 +229,33 @@ int main(int argc, char* argv[]){
     if(!adDists)
       goto memoryError;
 
+    /* Start 1B August 2012
+       Speed optimisation 1: allocate memory here once for the whole set of comparisons
+       We use the max sequence length to size the matrix and rely on each run of the needlemanWunsch algorithm to
+       initialise the values in the sub-set of the matrix space it will use
+       The change is repeated in head and slave node sections */
+    aadFMatrix = (double **) malloc((nM + 1)*sizeof(double *));
+    aanMoves   = (int **)    malloc((nM  + 1)*sizeof(int *));
+    if(!aadFMatrix || !aanMoves)
+      goto memoryError;
+    for(i = 0; i <= nM; i++){
+      aadFMatrix[i] = (double *)  malloc((nM + 1)*sizeof(double));
+      aanMoves[i]   = (int    *)  malloc((nM + 1)*sizeof(int));
+      if(!aadFMatrix[i] || !aanMoves[i])
+        goto memoryError;
+      
+      /* August 2012
+       Speed optimisation 3B: leave matrix empty initially except for edges*/
+      aadFMatrix[i][0] = GAP_PENALTY*i;
+      aanMoves[i][0] = UP; 
+      /* Because this master matrix is square, we can initialise the edges in 1 pass */
+      aadFMatrix[0][i] = GAP_PENALTY*i;
+      aanMoves[0][i] = LEFT;
+    }
+    /* End 1B */
+
     ulCount = 0; ulStart = ulA0 + (rank - 1)*ulA; ulFinish = ulA0 + rank*ulA;
-    
+
     //fprintf(stdout,"%d begin calculations\n",rank); fflush(stdout);
     for(i = 0; i < nN; i++){
       for(j = 0; j < i; j++){
@@ -207,8 +265,7 @@ int main(int argc, char* argv[]){
 	if(ulCount >= ulStart){
 
 	  needlemanWunsch(&tAlign, &tData.acSequences[i*nM], &tData.acSequences[j*nM], 
-			  tData.anLen[i], tData.anLen[j]);
-
+			  tData.anLen[i], tData.anLen[j], aadFMatrix, aanMoves);
 	  dDist = tAlign.dDist;
 
 	  adDists[ulCount - ulStart] = dDist;
@@ -223,9 +280,9 @@ int main(int argc, char* argv[]){
     }
   
   finish2:
-      
+
     ulPackets = ((ulA - 1)/MAX_PACKET_SIZE) + 1;
-      
+
     ulPacketCurr = 0;
     for(j = 0; j < ulPackets; j++){
       if(j < ulPackets - 1){
@@ -246,12 +303,21 @@ int main(int argc, char* argv[]){
     }
   }
  
-  /*free allocated memory*/
+  /* Start 1C August 2012
+     Speed optimisation 1: free allocated matrix*/
+  /*free allocated memory*/  
   free(adDists);
   free(tData.acSequences);
   free(tData.anLen);
+  for(i = 0; i <= nM; i++){
+    free(aadFMatrix[i]);
+    free(aanMoves[i]);
+  }
+  free(aadFMatrix);
+  free(aanMoves);
+  /* End1C August 2012 */  
+
   // Wait for everyone to stop   
-  
   MPI_Barrier(MPI_COMM_WORLD);
 
   // Always use MPI_Finalize as the last instruction of the program
@@ -333,43 +399,8 @@ void getCommandLineParams(t_Params *ptParams,int argc,char *argv[])
   exit(EXIT_FAILURE);
 }
 
-double dist(char cA, char cB)
-{
-  if(cA == cB){
-    return 0;
-  }
-  else{
-    return 1;
-  }
-}
-
-double dmin3(double dA, double dB, double dC)
-{
-  double dAB = dA < dB ? dA : dB;
-  
-  return dC < dAB? dC : dAB;
-}
-
-int getMove(double dA, double dB, double dC)
-{
-
-  if(dA < dB){
-    if(dA < dC){
-      return DIAG;
-    }
-    else{
-      return UP;
-    }
-  }
-  else{
-    if(dB < dC){
-      return LEFT;
-    }
-    else{
-      return UP;
-    }
-  }
-}
+/* August 2012
+   Speed optimisation 5B: inline loop functions */
 
 double calcDistance(char* acA, char* acB, int nLen)
 {
@@ -487,60 +518,33 @@ double calcDistance(char* acA, char* acB, int nLen)
   return distance;
 }
 
-void needlemanWunsch(t_Align *ptAlign, const char* acA, const char* acB, int nLenA, int nLenB)
+void needlemanWunsch(t_Align *ptAlign, const char* acA, const char* acB, int nLenA, int nLenB, double** aadFMatrix, int** aanMoves)
 {
-  double **aadFMatrix = NULL;
-  int    **aanMoves   = NULL;
   char    *acAlignA   = NULL, *acAlignB = NULL;
   int    nCount = 0;
   int    i = 0, j = 0; 
   
-  aadFMatrix = (double **) malloc((nLenA + 1)*sizeof(double *));
-  aanMoves   = (int **)    malloc((nLenA + 1)*sizeof(int *));
-  if(!aadFMatrix || !aanMoves)
-    goto memoryError;
+  /* August 2012
+   Speed optimisation 2: don't initialise the whole matrix space: once the top and left edge values have 
+   been initialised the algorithm always refers to values that have just been set */
+  
+  /* August 2012
+   Speed optimisation 3C: don't re-initialise the matrix edges as they dont change*/
+  
 
-  for(i = 0; i < nLenA + 1; i++){
-    aadFMatrix[i] = (double *)  malloc((nLenB + 1)*sizeof(double));
-    aanMoves[i]   = (int    *)  malloc((nLenB + 1)*sizeof(int));
-    if(!aadFMatrix[i] || !aanMoves[i])
-      goto memoryError;
-
-    for(j = 0; j < nLenB + 1; j++){
-      aadFMatrix[i][j] = 0.0;
-      aanMoves[i][j]   = -1;
-    }
-  }
-
-  for(i = 0; i <= nLenA; i++){
-    aadFMatrix[i][0] = GAP_PENALTY*i;
-    aanMoves[i][0] = UP;
-  }
-  for(j = 0; j <= nLenB; j++){ 
-    aadFMatrix[0][j] = GAP_PENALTY*j;
-    aanMoves[0][j] = LEFT;
-  }
-
+  /* August 2012
+   Speed optimisation 5A: streamline loop code */
+  double dChoice1, dChoice2, dChoice3, dPenaltyi, dPenaltyj;
   for(i = 1; i <= nLenA; i++){
+    dPenaltyi = i != nLenA ? GAP_PENALTY : 0;
+    
     for(j = 1; j <= nLenB; j++){
-      double dChoice1, dChoice2, dChoice3;
-      
+      dPenaltyj = j != nLenB ? GAP_PENALTY : 0;
+       
       dChoice1 = aadFMatrix[i-1][j-1] + dist(acA[i - 1], acB[j - 1]);
-      
-      if(i == nLenA){
-	dChoice2 = aadFMatrix[i][j-1];
-      } 
-      else{
-	dChoice2 = aadFMatrix[i][j-1] + GAP_PENALTY;
-      }
-
-      if(j == nLenB){
-	dChoice3 = aadFMatrix[i-1][j];
-      }
-      else{
-	dChoice3 = aadFMatrix[i-1][j] + GAP_PENALTY;
-      }
-      
+      dChoice2 = aadFMatrix[i][j-1] + dPenaltyi;
+      dChoice3 = aadFMatrix[i-1][j] + dPenaltyj;
+    
       aanMoves[i][j]   = getMove(dChoice1, dChoice2, dChoice3);
       aadFMatrix[i][j] = dmin3(dChoice1, dChoice2, dChoice3);
     }
@@ -612,12 +616,7 @@ void needlemanWunsch(t_Align *ptAlign, const char* acA, const char* acB, int nLe
   //fprintf(stderr,"\n\n");
   ptAlign->dDist = calcDistance(acAlignA, acAlignB, ptAlign->nLen);
 
-  for(i = 0; i <= nLenA; i++){
-    free(aadFMatrix[i]);
-    free(aanMoves[i]);
-  }
-  free(aadFMatrix);
-  free(aanMoves);
+
   free(acAlignA);
   free(acAlignB);
   return;

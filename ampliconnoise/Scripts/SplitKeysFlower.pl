@@ -11,7 +11,7 @@ my %keys = {};
 my $count = 0;
 my $fileName = 0;
 
-my $primer  = $ARGV[0];
+my $primer  = &translateIUPAC($ARGV[0]);
 my $keyFile = $ARGV[1];
 
 open(FILE, "$keyFile") or die;
@@ -147,4 +147,22 @@ sub flowToSeq()
     }
 
     return $retSeq;
+}
+
+sub translateIUPAC()
+{
+  my ($seq) = @_;
+
+  $seq=~s/W/\[AT\]/g;
+  $seq=~s/B/\[CGT\]/g;
+  $seq=~s/S/\[GC\]/g;  
+  $seq=~s/N/\[ACTG\]/g;
+  $seq=~s/Y/\[CT\]/g;
+  $seq=~s/R/\[AG\]/g;
+  $seq=~s/D/\[AGT\]/g;
+  $seq=~s/H/\[ACT\]/g;
+  $seq=~s/M/\[AC\]/g;
+  $seq=~s/K/\[GT\]/g;
+  $seq=~s/V/\[ACG\]/g;
+  return $seq;
 }

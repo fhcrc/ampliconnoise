@@ -16,15 +16,16 @@
 #include "Perseus.h"
 
 /*global constants*/
-static char *usage[] = {"Perseus - slays monsters\n",
+static char *usage[] = {"Perseus2 - slays monsters\n",
 			"-sin     string            seq file name\n",
 			"Options:\n",
+			"-s       integer\n",
 			"-tin     string            reference sequence file\n",
 			"-a                         output alignments\n",
 			"-d                         use imbalance\n",
 			"-rin     string            lookup file name\n"};
 
-static int  nLines = 7;
+static int  nLines = 8;
 
 static char szSequence[] = "ACGTNacgtn-";
 
@@ -44,23 +45,36 @@ int main(int argc, char* argv[]){
   /*get command line params*/
   getCommandLineParams(&tParams, argc, argv);
   
+  /*read sequences to chimera check*/
   readData(tParams.szSeqInputFile, &tSeqData);
 
+  /*read sequences to compare too*/
   readData(tParams.szRefInputFile, &tRefData);
  
+  /*set parameters for sequence distances*/
   initLookUp(&tParams);
 
-  /*do my bit*/
-  nN = tSeqData.nSeq; nK = tRefData.nSeq;
-  nNLen = tSeqData.nMaxLen; nKLen = tRefData.nMaxLen;
+  /*number of sequences*/
+  nN = tSeqData.nSeq; 
+
+  /*number of reference sequences*/
+  nK = tRefData.nSeq;
+  
+  /*max length of sequences*/
+  nNLen = tSeqData.nMaxLen; 
+
+  /*max length of references*/
+  nKLen = tRefData.nMaxLen;
 
   printf("%d %d\n",nN, nK);
 
   for(i = 0; i < nN; i++){
     t_Align atAlign[nK];
     int nLenI = tSeqData.anLen[i];
-    int anD[nLenI], anR[nLenI], anBestD[nLenI], anBestR[nLenI];
-    double dBest  = BIG_DBL, dBestChi = 0.0, dBestTri = 0.0;
+    double adD[nLenI], adR[nLenI];
+    int anD[nLenI], anR[nLenI];
+    int anBestD[nLenI], anBestR[nLenI];
+    double dBestD = BIG_DBL, dBestTriD = BIG_DBL, dBest  = BIG_DBL, dBestChi = 0.0, dBestTri = 0.0;
     int    nBestJ = -1;
     int    nBest = BIG_INT, nBestChi = BIG_INT, nBestTri = BIG_INT;
     int    nSplit = -1, nSplit1 = -1, nSplit2 = -1, nP1 = -1, nP2 = -1, nT1 = -1, nT2 = -1, nT3 = -1;
@@ -70,39 +84,18 @@ int main(int argc, char* argv[]){
 
     printf("%d %s ",i, tSeqData.aszID[i]);
 
-    /*do pairwise alignments and get best hit*/
-    nCompare = alignAll(i, nLenI, &nBest, &nBestJ, anRestrict, nK, &tSeqData, &tRefData, atAlign);
+    /*do pairwise alignments and get best hit for each sequence i*/
+    nCompare = alignAll(i, nLenI, &nBest, &nBestJ, anRestrict, nK, &tSeqData, &tRefData, atAlign, &tParams);
 
     if(nCompare >= 2){
 
-      nBestChi = getBestChimera(nK, &tRefData, &nP1, &nP2, &nSplit, anRestrict, nLenI, atAlign, anD, anR, anBestD, anBestR);
-      if(0)
-      {
-	int a1 = 0, a2 = 0;
-
-	for(a = 0; a < nLenI; a++){
-	  printf("%d %c ", a, tSeqData.acSequences[nNLen*i + a]);
-
-	  while((atAlign[nP1].acA[a1] == GAP || atAlign[nP1].acA[a1] == T_GAP) && a1 < atAlign[nP1].nLen){
-	    a1++;
-	  }
-
-	  printf("%c %d %d ", atAlign[nP1].acB[a1], atAlign[nP1].anD[a], atAlign[nP1].anR[nLenI - a - 2]);
-	  a1++;
-
-	  while((atAlign[nP2].acA[a2] == GAP || atAlign[nP2].acA[a2] == T_GAP) && a2 < atAlign[nP2].nLen ){
-	    a2++;
-	  }
-
-	  printf("%c %d %d ", atAlign[nP2].acB[a2], atAlign[nP2].anD[a], atAlign[nP2].anR[nLenI - a - 2]);
-	  a2++;
-
-	  printf("\n");
-	}
-	
-      }
+      dBestD = getBestChimeraD(nK, &tRefData, &nP1, &nP2, &nSplit, anRestrict, nLenI, atAlign, adD, adR, anBestD, anBestR);
+      nBestChi = atAlign[nP1].anD[nSplit] + atAlign[nP2].anR[nLenI - nSplit - 2];
       if(nBestChi >= 3 && nCompare >= 3){
-	nBestTri = getBestTrimera(nK, &tRefData, &nT1, &nT2, &nT3, &nSplit1, &nSplit2, anRestrict, nLenI, atAlign, anD, anR, anBestD, anBestR);
+	//setDR(nK, &tRefData, anRestrict, nLenI, atAlign, anD, anR, anBestD, anBestR);
+	dBestTriD = getBestTrimeraD(nK, &tRefData, &nT1, &nT2, &nT3, &nSplit1, &nSplit2, anRestrict, nLenI, atAlign, adD, adR, anBestD, anBestR);
+	nBestTri = atAlign[nT1].anD[nSplit1] - atAlign[nT2].anD[nSplit1] + atAlign[nT2].anD[nSplit2] + atAlign[nT3].anR[nLenI - nSplit2 - 2];
+	
       }
       
       dBestChi = ((double) nBestChi)/((double) nLenI);
@@ -164,6 +157,8 @@ int main(int argc, char* argv[]){
 	free(atAlign[j].acB);
 	free(atAlign[j].anD);
 	free(atAlign[j].anR);
+	free(atAlign[j].adD);
+	free(atAlign[j].adR);
 	free(atAlign[j].anMapD);
 	free(atAlign[j].anMapR);
       }
@@ -233,6 +228,17 @@ void getCommandLineParams(t_Params *ptParams,int argc,char *argv[])
   ptParams->szRefInputFile  = extractParameter(argc,argv, REF_INPUT_FILE,OPTION);  
   if(ptParams->szRefInputFile == NULL){
     ptParams->szRefInputFile = ptParams->szSeqInputFile;
+  }
+
+  szTemp  = extractParameter(argc,argv,SKEW,OPTION);  
+  if(szTemp != NULL){
+    ptParams->nSkew = strtol(szTemp,&cError,10);
+    if(*cError!='\0'){
+      goto error;
+    }
+  }
+  else{
+    ptParams->nSkew = DEFAULT_SKEW;
   }
 
   if(extractParameter(argc,argv,USE_IMBALANCE,OPTION)){  
@@ -427,6 +433,7 @@ void needlemanWunsch(t_Align *ptAlign, const char* acA, const char* acB, int nLe
   char    *acAlignA   = NULL, *acAlignB = NULL;
   int    nCount = 0;
   int    i = 0, j = 0, nD = 0, nR = 0; 
+  double dR = 0.0, dD = 0.0;
   
   aadFMatrix = (double **) malloc((nLenA + 1)*sizeof(double *));
   aanMoves   = (int **)    malloc((nLenA + 1)*sizeof(int *));
@@ -580,6 +587,15 @@ void needlemanWunsch(t_Align *ptAlign, const char* acA, const char* acB, int nLe
   if(!ptAlign->anR)
     goto memoryError;
 
+  ptAlign->adD = (double *) malloc(nLenA*sizeof(double));
+  if(!ptAlign->adD)
+    goto memoryError;
+
+  ptAlign->adR = (double *) malloc(nLenA*sizeof(double));
+  if(!ptAlign->adR)
+    goto memoryError;
+
+
   ptAlign->anMapD = (int *) malloc(nLenA*sizeof(int));
   if(!ptAlign->anMapD)
     goto memoryError;
@@ -588,8 +604,32 @@ void needlemanWunsch(t_Align *ptAlign, const char* acA, const char* acB, int nLe
   if(!ptAlign->anMapR)
     goto memoryError;
 
-  nCount = 0; nD = 0; 
+  nCount = 0; dD = 0; 
+  for(i = 0; i < ptAlign->nLen; i++){
+    if(ptAlign->acA[i] == GAP){
+      dD+=GAP_PENALTY_N;
+    }
+    else if(ptAlign->acA[i] == T_GAP){
 
+    }
+    else{
+      if(ptAlign->acB[i] == GAP){
+	dD+=GAP_PENALTY_N;
+      }
+      else if(ptAlign->acB[i] == T_GAP){
+	dD+=TERMINAL_PENALTY;
+      }
+      else{
+	dD+=distN(ptAlign->acA[i],ptAlign->acB[i]);
+      }
+     
+      ptAlign->adD[nCount] = dD;
+      nCount++; 
+    }
+    
+  }
+
+  nCount = 0; nD = 0; 
   for(i = 0; i < ptAlign->nLen; i++){
     if(ptAlign->acA[i] == GAP){
       nD++;
@@ -617,8 +657,35 @@ void needlemanWunsch(t_Align *ptAlign, const char* acA, const char* acB, int nLe
 
   ptAlign->nDiff = nD;
 
-  nCount = 0; nR = 0; 
+  ptAlign->dDiff = dD;
 
+  nCount = 0; dR = 0.0; 
+  for(i = ptAlign->nLen - 1; i >= 0; i--){
+    
+    if(ptAlign->acA[i] == GAP){
+      dR+=GAP_PENALTY_N;
+    }
+    else if(ptAlign->acA[i] == T_GAP){
+
+    }
+    else{
+      if(ptAlign->acB[i] == GAP){
+	dR+=GAP_PENALTY_N;
+      }
+      else if(ptAlign->acB[i] == T_GAP){
+	dR+=TERMINAL_PENALTY;
+      }
+      else{
+	dR+=distN(ptAlign->acA[i],ptAlign->acB[i]);
+      }
+      
+      ptAlign->adR[nCount] = dR;
+      
+      nCount++; 
+    }
+  }
+
+  nCount = 0; nR = 0; 
   for(i = ptAlign->nLen - 1; i >= 0; i--){
     
     if(ptAlign->acA[i] == GAP){
@@ -632,7 +699,7 @@ void needlemanWunsch(t_Align *ptAlign, const char* acA, const char* acB, int nLe
 	nR++;
       }
       else if(ptAlign->acB[i] == T_GAP){
-	nR++;
+	//nR++;
       }
       else if(ptAlign->acB[i] != ptAlign->acA[i]){
 	nR++;
@@ -1316,6 +1383,48 @@ int getDifferenceRight(t_Align* ptA, t_Align* ptB, int nSplit, int nLenI)
   return nDiff;
 }
 
+void allocateMatricesD(int nLenI, double ***paadT, int ***paanBestT, double ***paadT2, int ***paanBestT2)
+{
+  double **aadT     = NULL;
+  int **aanBestT = NULL;
+  double **aadT2     = NULL;
+  int **aanBestT2 = NULL;
+  int k = 0, l = 0, m = 0;
+
+  aadT     = (double **) malloc(nLenI*sizeof(double *));
+  aanBestT = (int **) malloc(nLenI*sizeof(int *));
+
+  for(k = 0; k < nLenI; k++){
+    aadT[k]     = (double *) malloc(nLenI*sizeof(double));
+    aanBestT[k] = (int *) malloc(nLenI*sizeof(int));
+    
+    for(l = 0; l < nLenI; l++){
+      aadT[k][l] = 0.0;
+      aanBestT[k][l] = 0;
+    }
+  }
+
+  aadT2     = (double **) malloc(nLenI*sizeof(double *));
+  aanBestT2 = (int **) malloc(nLenI*sizeof(int *));
+
+  for(k = 0; k < nLenI; k++){
+    aadT2[k]     = (double *) malloc(nLenI*sizeof(double));
+    aanBestT2[k] = (int *) malloc(nLenI*sizeof(int));
+    
+    for(l = 0; l < nLenI; l++){
+      aadT2[k][l] = 0.0;
+      aanBestT2[k][l] = 0;
+    }
+  }
+
+  *paadT = aadT;
+  *paanBestT = aanBestT; 
+  *paadT2 = aadT2;
+  *paanBestT2 = aanBestT2;
+
+  return;
+}
+
 void allocateMatrices(int nLenI, int ***paanT, int ***paanBestT, int ***paanT2, int ***paanBestT2)
 {
   int **aanT     = NULL;
@@ -1484,8 +1593,9 @@ double calcLoonIndex(t_Data *ptSeqData, t_Data *ptRefData, int nI, int nP1, int 
   char* acSequences = NULL;
   double dRet = 0;
   char szTempFasta[MAX_LINE_LENGTH], szTempAlign[MAX_LINE_LENGTH];
-  int nO1 = 0, nO2 = 0, nO3 = 0, nOffset = 0;
+  int nTGap1 = 0, nTGap2 = 0, nTGap3 = 0,nMaxTGap = -1;
 
+  /*create sequence filenames*/
   if(ptParams->bOutputAlignments == FALSE){
   	sprintf(szTempFasta, "Temp%s",FASTA_SUFFIX);
   	sprintf(szTempAlign, "Temp%s",ALIGN_SUFFIX);
@@ -1495,8 +1605,8 @@ double calcLoonIndex(t_Data *ptSeqData, t_Data *ptRefData, int nI, int nP1, int 
   	sprintf(szTempAlign, "Temp%d%s",nI,ALIGN_SUFFIX);
   }
 
+  /*write sequences*/
   ofp = fopen(szTempFasta, "w");
-
   if(ofp){
     writeSequenceI(ofp, ptSeqData, nI);
     writeSequenceI(ofp, ptRefData, nP1);
@@ -1507,45 +1617,38 @@ double calcLoonIndex(t_Data *ptSeqData, t_Data *ptRefData, int nI, int nP1, int 
     fprintf(stderr, "Failed to open %s for writing ... abort\n",szTempFasta);
     exit(EXIT_FAILURE);
   }
-  
+  /*run mafft remotely*/
   sprintf(szCommand,"mafft-linsi %s > %s 2> %s",szTempFasta,szTempAlign, TEMP_ERROR_FILE);
 
   system(szCommand);
 
+  /*read in mafft output - three sequence alignment*/
   readData(szTempAlign, &tAlign);
  
   acSequences = tAlign.acSequences;  nMaxLen = tAlign.nMaxLen;
-  //nO1 = calcOffset(acSequences, nMaxLen); nO2 = calcOffset(acSequences + nMaxLen, nMaxLen); nO3 = calcOffset(acSequences + 2*nMaxLen, nMaxLen);
 
-  //nOffset =  nO1 > nO2 ? nO1 : nO2;
-  //nOffset = nO3 > nOffset ? nO3 : nOffset;
- 
+  /*alignment length*/
   nTLen = tAlign.nMaxLen;
 
-  if(1){
-	int nTGap1 = 0, nTGap2 = 0, nTGap3 = 0,nMaxTGap = -1;
+  /*find largest terminal gap*/
+  while(acSequences[nTLen - 1 - nTGap1] == GAP && nTLen - nTGap1> 1){
+    nTGap1++;
+  }
 
-  	while(acSequences[nTLen - 1 - nTGap1] == GAP && nTLen - nTGap1> 1){
-    		nTGap1++;
-  	}
+  while(acSequences[nMaxLen + nTLen - 1 - nTGap2] == GAP && nTLen - nTGap2> 1){
+    nTGap2++;
+  }
 
-  	while(acSequences[nMaxLen + nTLen - 1 - nTGap2] == GAP && nTLen - nTGap2> 1){
-    		nTGap2++;
-  	}
+  while(acSequences[2*nMaxLen + nTLen - 1 - nTGap3] == GAP && nTLen - nTGap3> 1){
+    nTGap3++;
+  }
 
-  	while(acSequences[2*nMaxLen + nTLen - 1 - nTGap3] == GAP && nTLen - nTGap3> 1){
-    		nTGap3++;
-  	}
+  nMaxTGap = nTGap1 > nTGap2 ? nTGap1 : nTGap2;		
+  nMaxTGap = nTGap3 > nMaxTGap ? nTGap3 : nMaxTGap;
+  /*remove from alignment*/
+  nTLen -= nMaxTGap;	
 
-	nMaxTGap = nTGap1 > nTGap2 ? nTGap1 : nTGap2;		
-	nMaxTGap = nTGap3 > nMaxTGap ? nTGap3 : nMaxTGap;
-	nTLen -= nMaxTGap;
-	//printf("%d %d %d %d\n",nTGap1,nTGap2,nTGap3, nMaxTGap);
-  }	
-
-
-
-
+  /*find all differences between chimera and parents and positions*/
   for(i = 0; i < nTLen; i++){
     if(acSequences[i] != acSequences[nMaxLen + i]){
       if(nDiff1 < MAX_DIFF){
@@ -1576,7 +1679,7 @@ double calcLoonIndex(t_Data *ptSeqData, t_Data *ptRefData, int nI, int nP1, int 
   anSplits[s] = -1;
   anD[s] = nDiff2;
   s++;
-
+  /*loop differences to find optimal split point*/
   while(s1 < nDiff1 || s2 < nDiff2){
     if(anDiff1[s1] <= anDiff2[s2]){
       anD[s] = anD[s - 1] + 1;
@@ -1602,6 +1705,7 @@ double calcLoonIndex(t_Data *ptSeqData, t_Data *ptRefData, int nI, int nP1, int 
       sMin = i;
     }
   }
+  
   if(sMin < s - 1){
     nSplit = (anSplits[sMin] + anSplits[sMin + 1])/2;
   }
@@ -1609,6 +1713,7 @@ double calcLoonIndex(t_Data *ptSeqData, t_Data *ptRefData, int nI, int nP1, int 
     nSplit = nTLen - 1;
   }
 
+  /*dummy if, as we always do this*/
   if(TRUE){
     int nA = -1, nB = -1;
     int nDLP1 = 0, nDRP1 = 0, nDLP2 = 0, nDRP2 = 0;
@@ -1620,22 +1725,25 @@ double calcLoonIndex(t_Data *ptSeqData, t_Data *ptRefData, int nI, int nP1, int 
 
     for(i = 0; i < nTLen; i++){
       char cI = acSequences[i], cP1 = acSequences[nMaxLen + i], cP2 = acSequences[2*nMaxLen + i];
-
+      /*get consenus base*/
       cC = getC(cI, cP1, cP2);
 
+      /*count number of differences between chimera and consensus*/
       if(cI != cC){
 	nZ++;
       }
-
+      /*count number of differences between chimera and parent 1*/
       if(cP1 != cC){
+	/*count number to left*/
 	if(i <= nSplit){
 	  nDLP1++;
 	}
+	/*count number to right*/
 	else{
 	  nDRP1++;
 	}
       }
-      
+      /*count number of differences between chimera and parent 2*/
       if(cP2 != cC){
 	if(i <= nSplit){
 	  nDLP2++;
@@ -1645,7 +1753,7 @@ double calcLoonIndex(t_Data *ptSeqData, t_Data *ptRefData, int nI, int nP1, int 
 	}
       }
     }
-
+    /*if Parent1 is left*/
     if(nDiff1 <= nDiff2){
       nA = nP1;
       nB = nP2;
@@ -1656,10 +1764,11 @@ double calcLoonIndex(t_Data *ptSeqData, t_Data *ptRefData, int nI, int nP1, int 
       nY = nDLP2 + nDRP2;
       nYA = nDLP2; nYB = nDRP2;
 
-      pA = ((double) nSplit + 1)/((double) nTLen);
-      pB = ((double) nTLen - nSplit - 1)/((double) nTLen);;
+      pA = ((double) nSplit + 1)/((double) nTLen); /*probability of change to left*/
+      pB = ((double) nTLen - nSplit - 1)/((double) nTLen);/*prob. to right*/
     }
     else{
+      /*if parent 1 is right*/
       nA = nP2;
       nB = nP1;
 
@@ -1670,7 +1779,7 @@ double calcLoonIndex(t_Data *ptSeqData, t_Data *ptRefData, int nI, int nP1, int 
       nYA = nDRP1; nYB = nDLP1;
 
       pB = ((double) nSplit + 1)/((double) nTLen);
-      pA = ((double) nTLen - nSplit - 1)/((double) nTLen);;
+      pA = ((double) nTLen - nSplit - 1)/((double) nTLen);
     }
 
     nXZ = nX + nZ;
@@ -1678,6 +1787,7 @@ double calcLoonIndex(t_Data *ptSeqData, t_Data *ptRefData, int nI, int nP1, int 
     dRet = 0.0;
     dP = 0.0;
     
+    /*adds extra factor for tree imbalance - not generally used*/
     if(ptParams->bImbalance){
       if(nXZ > 0){
 	for(i = nX; i <= nXZ; i++){
@@ -1688,6 +1798,7 @@ double calcLoonIndex(t_Data *ptSeqData, t_Data *ptRefData, int nI, int nP1, int 
       }
     }
 
+    /*contribution from right parent*/
     if(nY > 0){
       dP = 0.0;
       for(i = nYA; i <= nY; i++){
@@ -1696,6 +1807,7 @@ double calcLoonIndex(t_Data *ptSeqData, t_Data *ptRefData, int nI, int nP1, int 
       dRet += -log(dP);
     }
 
+    /*contribution from left*/
     if(nX > 0){
       dP = 0.0;
       for(i = nXB; i <= nX; i++){
@@ -1727,7 +1839,7 @@ void destroyData(t_Data *ptData)
   }
 }
 
-int alignAll(int nI, int nLenI, int *pnBest, int *pnBestJ, int *anRestrict, int nK, t_Data *ptSeqData, t_Data *ptRefData, t_Align* atAlign)
+int alignAll(int nI, int nLenI, int *pnBest, int *pnBestJ, int *anRestrict, int nK, t_Data *ptSeqData, t_Data *ptRefData, t_Align* atAlign, t_Params *ptParams)
 {
   int j = 0, nCompare = 0, nBest = BIG_INT, nBestJ = -1;
   int nNLen = ptSeqData->nMaxLen, nKLen = ptRefData->nMaxLen;
@@ -1735,7 +1847,7 @@ int alignAll(int nI, int nLenI, int *pnBest, int *pnBestJ, int *anRestrict, int 
   for(j = 0; j < nK; j++){
     int     nDist = 0;
 
-    if(strcmp(ptRefData->aszID[j],ptSeqData->aszID[nI]) != 0 && ptRefData->adFreq[j] >= ptSeqData->adFreq[nI]){
+    if(strcmp(ptRefData->aszID[j],ptSeqData->aszID[nI]) != 0 && ptRefData->adFreq[j] >= ptParams->nSkew*ptSeqData->adFreq[nI]){
 
       needlemanWunsch(&atAlign[j], &ptSeqData->acSequences[nI*nNLen], &ptRefData->acSequences[j*nKLen], nLenI, ptRefData->anLen[j]);
       
@@ -1812,6 +1924,107 @@ int getBestChimera(int nK, t_Data *ptRefData, int* pnP1, int* pnP2, int *pnSplit
   return nBestChi;
 }
 
+int setDR(int nK, t_Data *ptRefData, int* anRestrict, int nLenI, t_Align* atAlign, int* anD, int* anR, int* anBestD, int* anBestR)
+{
+  int j = 0, k = 0;
+  int nP1 = -1, nP2 = -1;
+  int nSplit;
+  int nBestChi = BIG_INT;
+
+  for(k = 0; k < nLenI; k++){
+    anD[k] = BIG_INT; anBestD[k] = -1;
+
+    for(j = 0; j < nK; j++){
+      if(anRestrict[j] == FALSE){
+
+	if(atAlign[j].anD[k]  < anD[k] || atAlign[j].anD[k] == anD[k] && ptRefData->adFreq[j] > ptRefData->adFreq[anBestD[k]]){
+	  anD[k]     = atAlign[j].anD[k];
+	  anBestD[k] = j;
+	}
+	    
+      }
+    }
+  }
+      
+  for(k = 0; k < nLenI; k++){
+    anR[k] = BIG_INT; anBestR[k] = -1;
+
+    for(j = 0; j < nK; j++){
+      if(anRestrict[j] == FALSE){
+	if(atAlign[j].anR[k] < anR[k] || atAlign[j].anR[k] == anR[k] && ptRefData->adFreq[j] > ptRefData->adFreq[anBestR[k]]){
+	  anR[k]     = atAlign[j].anR[k];
+	  anBestR[k] = j;
+	}
+      }
+    }
+  }
+    
+  for(k = 0; k < nLenI - 1; k++){
+    int nChi = anD[k] + anR[nLenI - k - 2];
+    if(nChi < nBestChi){
+      nBestChi = nChi;
+      nSplit = k;
+      nP1 = anBestD[k];
+      nP2 = anBestR[nLenI - k - 2];
+    }
+  }
+
+  return nBestChi;
+}
+
+double getBestChimeraD(int nK, t_Data *ptRefData, int* pnP1, int* pnP2, int *pnSplit, int* anRestrict, int nLenI, t_Align* atAlign, double* adD, double* adR, int* anBestD, int* anBestR)
+{
+  int j = 0, k = 0;
+  int nP1 = -1, nP2 = -1;
+  int nSplit;
+  double dBestChi = BIG_DBL;
+  int nBestChi = -1;
+
+  for(k = 0; k < nLenI; k++){
+    adD[k] = BIG_DBL; anBestD[k] = -1;
+
+    for(j = 0; j < nK; j++){
+      if(anRestrict[j] == FALSE){
+
+	if(atAlign[j].adD[k]  < adD[k] || atAlign[j].adD[k] == adD[k] && ptRefData->adFreq[j] > ptRefData->adFreq[anBestD[k]]){
+	  adD[k]     = atAlign[j].adD[k];
+	  anBestD[k] = j;
+	}
+	    
+      }
+    }
+  }
+      
+  for(k = 0; k < nLenI; k++){
+    adR[k] = BIG_DBL; anBestR[k] = -1;
+
+    for(j = 0; j < nK; j++){
+      if(anRestrict[j] == FALSE){
+	if(atAlign[j].adR[k] < adR[k] || atAlign[j].adR[k] == adR[k] && ptRefData->adFreq[j] > ptRefData->adFreq[anBestR[k]]){
+	  adR[k]     = atAlign[j].adR[k];
+	  anBestR[k] = j;
+	}
+      }
+    }
+  }
+    
+  for(k = 0; k < nLenI - 1; k++){
+    double dChi = adD[k] + adR[nLenI - k - 2];
+    if(dChi < dBestChi){
+      dBestChi = dChi;
+      nSplit = k;
+      nP1 = anBestD[k];
+      nP2 = anBestR[nLenI - k - 2];
+    }
+  }
+
+  *pnSplit = nSplit;
+  *pnP1 = nP1;
+  *pnP2 = nP2;
+  
+  return dBestChi;
+}
+
 int getBestTrimera(int nK, t_Data *ptRefData, int* pnT1, int* pnT2, int* pnT3, int *pnSplit1, int *pnSplit2, int* anRestrict, int nLenI, t_Align* atAlign, int* anD, int* anR, int* anBestD, int *anBestR)
 {
   int j = 0, k = 0, l = 0;
@@ -1873,3 +2086,93 @@ int getBestTrimera(int nK, t_Data *ptRefData, int* pnT1, int* pnT2, int* pnT3, i
 
   return nBestTri;
 }
+
+double getBestTrimeraD(int nK, t_Data *ptRefData, int* pnT1, int* pnT2, int* pnT3, int *pnSplit1, int *pnSplit2, int* anRestrict, int nLenI, t_Align* atAlign, double* adD, double* adR, int* anBestD, int *anBestR)
+{
+  int j = 0, k = 0, l = 0;
+  double ** aadT = NULL;
+  int **aanBestT = NULL;
+  double **aadT2 = NULL;
+  int  **aanBestT2 = NULL;
+  double dBestTri = BIG_DBL;
+  int nT1 = -1, nT2 = -1, nT3 = -1, nSplit1 = -1, nSplit2 = -1;
+
+  allocateMatricesD(nLenI, &aadT,&aanBestT,&aadT2,&aanBestT2);
+
+  for(k = 0; k < nLenI; k++){
+    for(l = k; l < nLenI - 1; l++){
+      aadT[k][l] = BIG_DBL; aanBestT[k][l] = -1;
+	
+      for(j = 0; j < nK; j++){
+	if(anRestrict[j] == FALSE){
+	  double dX = atAlign[j].adD[l] - atAlign[j].adD[k];
+		
+	  if(dX < aadT[k][l] || dX == aadT[k][l] && ptRefData->adFreq[j] > ptRefData->adFreq[aanBestT[k][l]]){
+	    aadT[k][l] = dX;
+	    aanBestT[k][l] = j;
+	  }
+	  
+	}
+      }
+
+      aadT[k][l] += adD[k] + adR[nLenI - l - 2];
+
+      if(aadT[k][l] < dBestTri){
+	dBestTri = aadT[k][l];
+	nSplit1 = k;
+	nSplit2 = l;
+	nT1 = anBestD[k];
+	nT2 = aanBestT[k][l];
+	nT3 = anBestR[nLenI -l -2];
+      }
+    }
+  }
+
+  (*pnT1) = nT1;
+  (*pnT2) = nT2;
+  (*pnT3) = nT3;
+
+  (*pnSplit1) = nSplit1;
+  (*pnSplit2) = nSplit2;
+
+  for(j = 0; j < nLenI; j++){
+    free(aadT[j]);
+    free(aanBestT[j]);
+    free(aadT2[j]);
+    free(aanBestT2[j]);
+  }
+
+  free(aadT);
+  free(aanBestT);
+  free(aadT2);
+  free(aanBestT2);
+
+  return dBestTri;
+}
+
+/*void writeAlignment(int nLenI)
+{
+  int a = 0, a1 = 0, a2 = 0;
+
+  for(a = 0; a < nLenI; a++){
+    printf("%d %c ", a, tSeqData.acSequences[nNLen*i + a]);
+
+    while((atAlign[nP1].acA[a1] == GAP || atAlign[nP1].acA[a1] == T_GAP) && a1 < atAlign[nP1].nLen){
+      a1++;
+    }
+
+    printf("%c %d %d ", atAlign[nP1].acB[a1], atAlign[nP1].anD[a], atAlign[nP1].anR[nLenI - a - 2]);
+    a1++;
+
+    while((atAlign[nP2].acA[a2] == GAP || atAlign[nP2].acA[a2] == T_GAP) && a2 < atAlign[nP2].nLen ){
+	    a2++;
+    }
+
+    printf("%c %d %d ", atAlign[nP2].acB[a2], atAlign[nP2].anD[a], atAlign[nP2].anR[nLenI - a - 2]);
+    a2++;
+
+    printf("\n");
+  }
+	
+ }
+ }*/

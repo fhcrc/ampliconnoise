@@ -29,6 +29,8 @@ typedef struct s_Params
   int bOutputAlignments;
 
   char *szLookUpFile;
+
+  int nSkew;
 } t_Params;
 
 typedef struct s_Data
@@ -65,15 +67,17 @@ typedef struct s_Data
 #define SEQ_INPUT_FILE       "-sin"
 #define USE_IMBALANCE        "-d"
 #define OUTPUT_ALIGNMENTS    "-a"
+#define SKEW                 "-s"
 
 #define GAP_PENALTY     1.5
 #define GAP             '-'
 #define T_GAP           '.'
 #define COMMA           ","
 
+#define DEFAULT_SKEW          1
 #define GAP_PENALTY_N         15.0
 #define HOMOPOLYMER_PENALTY   4.0
-
+#define TERMINAL_PENALTY      1.39
 #define MIS_MATCH       '#'
 
 #define DIAG  0
@@ -110,11 +114,17 @@ typedef struct s_Align
 
   int   nDiff;
 
+  double dDiff;
+
   double dDist;
 
   int *anMapD;
 
+  double *adD;
+
   int *anMapR;
+
+  double* adR;
 
   int *anD;
 
@@ -150,6 +160,8 @@ int getDifferenceRight(t_Align* ptA, t_Align* ptB, int nSplit, int nLenI);
 
 void allocateMatrices(int nLenI, int ***paanT, int ***paanBestT, int ***paanT2, int ***paanBestT2);
 
+void allocateMatricesD(int nLenI, double ***paadT, int ***paanBestT, double ***paadT2, int ***paanBestT2);
+
 char* getTrimera(int *pnCLength, t_Align* ptA, t_Align* ptB, t_Align* ptC, int nSplit1, int nSplit2, int nLenI);
 
 char* getQuamera(int *pnCLength, t_Align* ptA, t_Align* ptB, t_Align* ptC, t_Align* ptD, int nSplit1, int nSplit2, int nSplit3, int nLenI);
@@ -158,10 +170,18 @@ double calcLoonIndex(t_Data *ptSeqData, t_Data *ptRefData, int nI, int nP1, int 
 
 void destroyData(t_Data *ptData);
 
-int alignAll(int nI, int nLenI, int *pnBest, int *pnBestJ, int *anRestrict, int nK, t_Data *ptSeqData, t_Data *ptRefData, t_Align* atAlign);
+double distN(char cA, char cB);
+
+int alignAll(int nI, int nLenI, int *pnBest, int *pnBestJ, int *anRestrict, int nK, t_Data *ptSeqData, t_Data *ptRefData, t_Align* atAlign, t_Params *ptParams);
 
 int getBestChimera(int nK, t_Data *ptRefData, int* pnP1, int* pnP2, int *pnSplit, int* anRestrict, int nLenI, t_Align* atAlign, int* anD, int* anR, int* anBestD, int* anBestR);
 
 int getBestTrimera(int nK, t_Data *ptRefData, int* pnT1, int* pnT2, int* pnT3, int *pnSplit1, int *pnSplit2, int* anRestrict, int nLenI, t_Align* atAlign, int* anD, int* anR, int* anBestD, int *anBestR);
+
+double getBestTrimeraD(int nK, t_Data *ptRefData, int* pnT1, int* pnT2, int* pnT3, int *pnSplit1, int *pnSplit2, int* anRestrict, int nLenI, t_Align* atAlign, double* adD, double* adR, int* anBestD, int *anBestR);
+
+double getBestChimeraD(int nK, t_Data *ptRefData, int* pnP1, int* pnP2, int *pnSplit, int* anRestrict, int nLenI, t_Align* atAlign, double* adD, double* adR, int* anBestD, int* anBestR);
+
+int setDR(int nK, t_Data *ptRefData, int* anRestrict, int nLenI, t_Align* atAlign, int* anD, int* anR, int* anBestD, int* anBestR);
 
 #endif

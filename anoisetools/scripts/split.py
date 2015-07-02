@@ -270,7 +270,7 @@ def build_parser(subparsers):
     parser.add_argument('-o', '--outfile', help="""Name of file to write
             sequence counts [default: stdout]""", default=sys.stdout,
             type=argparse.FileType('w'))
-    parser.add_argument('--write-control', default=argparse.SUPPRESS,
+    parser.add_argument('--write-control', 
             action='store_true', help="""Write control.json files""")
 
     return parser
